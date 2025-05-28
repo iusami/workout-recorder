@@ -4,10 +4,11 @@ services:
     container_name: workout_recorder_postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     environment:
-      POSTGRES_USER: user
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: workout_recorder
+      POSTGRES_DB: workout-recorder
     ports:
       - "5432:5432"
     networks:
@@ -23,8 +24,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # 例: postgresql+psycopg://user:password@postgres/workout_recorder
-      DATABASE_URL: "postgresql+psycopg://user:password@postgres:5432/workout_recorder"
+      DATABASE_URL: "postgresql://user:password@postgres:5432/workout-recorder"
       # 他に必要な環境変数
     depends_on:
       - postgres
