@@ -1,0 +1,44 @@
+{
+  "name": "backend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/backend/src",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run uvicorn src.main:create_app --host 0.0.0.0 --port 8000 --reload",
+        "cwd": "apps/backend"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run pytest",
+        "cwd": "apps/backend"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run ruff src && uv run mypy src",
+        "cwd": "apps/backend"
+      }
+    },
+    "migrate:generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run alembic revision --autogenerate -m '{args.message}'",
+        "cwd": "apps/backend"
+      }
+    },
+    "migrate:up": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run alembic upgrade head",
+        "cwd": "apps/backend"
+      }
+    }
+  },
+  "tags": []
+}

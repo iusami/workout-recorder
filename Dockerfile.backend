@@ -1,0 +1,50 @@
+# Dockerfile.backend (Python 3.12 版)
+
+# --- ステージ 1: ビルダー ---
+# Pythonベースイメージを 3.12-slim に変更
+FROM python:3.12-slim AS builder
+
+# uvをインストール
+RUN pip install uv
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# Pythonのキャッシュを無効化
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# 依存関係ファイルのみをコピー
+COPY apps/backend/pyproject.toml ./apps/backend/
+
+# uvを使って依存関係をシステム全体にインストール
+RUN uv pip install --system --no-cache -e "./apps/backend[dev]"
+
+# --- ステージ 2: ランタイム ---
+# ビルダーと同じベースイメージ (3.12-slim) を使用
+FROM python:3.12-slim
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# Pythonのキャッシュを無効化
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# ビルダーステージからインストール済みのライブラリとuvをコピー
+# パスを 3.12 に変更
+COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
+COPY --from=builder /usr/local/bin/ /usr/local/bin/
+
+# バックエンドのアプリケーションコードをコピー
+COPY apps/backend/src ./src
+COPY apps/backend/alembic ./alembic
+COPY apps/backend/alembic.ini ./
+
+# FastAPIがリッスンするポート
+EXPOSE 8000
+
+# アプリケーションを起動するコマンド
+# --host 0.0.0.0 でコンテナ外部からのアクセスを許可
+# --reload オプションは開発時には便利ですが、本番では外すことを推奨します。
+CMD ["uvicorn", "src.main:create_app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

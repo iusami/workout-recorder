@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: workout_recorder_postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: workout_recorder
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: workout_recorder_backend
+    volumes:
+      - ./apps/backend:/app # 開発時のホットリロード用 (本番では外す)
+    ports:
+      - "8000:8000"
+    environment:
+      # 例: postgresql+psycopg://user:password@postgres/workout_recorder
+      DATABASE_URL: "postgresql+psycopg://user:password@postgres:5432/workout_recorder"
+      # 他に必要な環境変数
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+    # entrypoint: を使って起動時にマイグレーションを実行することも可能
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: workout_recorder_frontend
+    # volumes:
+    #   - ./apps/frontend:/app # 開発時のホットリロード用 (本番では外す)
+    #   - /app/node_modules # 開発時のvolumeマウントで上書きされないように
+    #   - /app/.next # 開発時のvolumeマウントで上書きされないように
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000" # または backend:8000
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
