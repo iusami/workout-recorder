@@ -46,6 +46,8 @@ jobs:
         
     - name: Run backend tests
       run: npx nx test backend
+      env:
+        CI: true
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
