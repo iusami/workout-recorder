@@ -1,7 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import PostgresDsn, Field
-from typing import Optional
+from typing import Optional, Union
 from pathlib import Path
+import os
 
 
 class Settings(BaseSettings):
@@ -17,24 +18,36 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
     )
 
-    # データベースURL (Pydanticが形式を検証)
-    DATABASE_URL: PostgresDsn
+    # データベースURL (PostgreSQL または SQLite)
+    # CI環境ではSQLiteを使用
+    DATABASE_URL: str = (
+        "sqlite+aiosqlite:///./test.db" if os.environ.get("CI") else Field(...)
+    )
 
     # テスト用データベースURL (環境変数 TEST_DATABASE_URL がなければ None)
-    TEST_DATABASE_URL: Optional[PostgresDsn] = Field(None)
+    # CI環境ではSQLiteを使用
+    TEST_DATABASE_URL: Optional[str] = Field(
+        default="sqlite+aiosqlite:///./test.db" if os.environ.get("CI") else None
+    )
 
     # 非同期DB接続用のURLを生成するプロパティ
     @property
     def ASYNC_DATABASE_URL(self) -> str:
         # Pydantic v2 では str() を使う
-        return str(self.DATABASE_URL).replace("postgresql://", "postgresql+asyncpg://")
+        url = str(self.DATABASE_URL)
+        # PostgreSQLの場合のみasyncpgに変換
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://")
+        return url
 
     @property
     def ASYNC_TEST_DATABASE_URL(self) -> Optional[str]:
         if self.TEST_DATABASE_URL:
-            return str(self.TEST_DATABASE_URL).replace(
-                "postgresql://", "postgresql+asyncpg://"
-            )
+            url = str(self.TEST_DATABASE_URL)
+            # PostgreSQLの場合のみasyncpgに変換
+            if url.startswith("postgresql://"):
+                return url.replace("postgresql://", "postgresql+asyncpg://")
+            return url
         return None
 
 
