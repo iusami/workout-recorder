@@ -21,7 +21,14 @@
     "lint": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "uv run ruff src && uv run mypy src",
+        "command": "uv run ruff format src && uv run mypy src",
+        "cwd": "apps/backend"
+      }
+    },
+    "check":{
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run ruff check src",
         "cwd": "apps/backend"
       }
     },
