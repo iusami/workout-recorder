@@ -1,47 +1,66 @@
-import asyncio
 import pytest
+import asyncio
 import pytest_asyncio
 from typing import AsyncGenerator
+
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker, AsyncEngine
+from sqlmodel import SQLModel
 
-# src ディレクトリのファイルをインポートできるようにする
-# (pytest.ini の pythonpath設定と合わせて確認)
-from src.main import create_app  # FastAPI アプリのインスタンス
-from src.core.database import (
-    async_session_local,
-    engine,
-    get_session,
-    create_db_and_tables,
-    drop_db_and_tables,
-)
-# ↓↓↓↓↓ 重要: SQLModelのテーブル定義を読み込ませる ↓↓↓↓↓
-from src import models # __init__.py などでモデルをインポートしておく
+from src.main import create_app
+from src.core.config import settings
+from src.core.database import get_session
 
-# テストエンジンが存在しない場合はスキップ (TEST_DATABASE_URL未設定時)
-if not engine:
+# テスト用DB URLを確定
+TEST_DATABASE_URL = settings.ASYNC_TEST_DATABASE_URL
+if not TEST_DATABASE_URL:
     pytest.skip("TEST_DATABASE_URL not set, skipping integration tests", allow_module_level=True)
 
 
+@pytest.fixture(scope="session")
+def event_loop(): # この session スコープの event_loop を使う
+    """
+    テストセッション全体で単一のイベントループを作成して使用する。
+    """
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest_asyncio.fixture(scope="session")
+async def test_engine(event_loop) -> AsyncGenerator[AsyncEngine, None]:
+    """
+    セッションスコープで非同期テストエンジンを作成するフィクスチャ。
+    引数で渡された session スコープの event_loop を使用します。
+    """
+    # event_loop フィクスチャがこのスコープで asyncio.set_event_loop() を
+    # 呼び出していることを pytest-asyncio が期待します。
+    # create_async_engine は現在のループを使用します。
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    yield engine
+    await engine.dispose()
+
+
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def setup_database():
+async def setup_tables(test_engine: AsyncEngine):
     """
-    各テスト関数の前にDBテーブルを作成し、テスト後に削除するフィクスチャ。
-    autouse=True で自動的に実行される。
+    各テストの前にテーブルを再作成するフィクスチャ。
     """
-    assert engine is not None, "Test engine not initialized"
-    await create_db_and_tables(engine)
-    yield  # ここでテストが実行される
-    await drop_db_and_tables(engine)
+    async with test_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+        await conn.run_sync(SQLModel.metadata.create_all)
+    yield
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     """
-    テスト用の非同期DBセッションを提供するフィクスチャ。
+    各テスト用の非同期DBセッションを提供するフィクスチャ。
     """
-    assert async_session_local is not None, "Test session not initialized"
-    async with async_session_local() as session:
+    session_maker = async_sessionmaker(
+        bind=test_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with session_maker() as session:
         yield session
 
 
@@ -49,27 +68,15 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
     FastAPIのTestClientを提供するフィクスチャ。
-    DBセッションをテスト用にオーバーライドします。
     """
+    app = create_app()
 
     async def _override_get_session() -> AsyncGenerator[AsyncSession, None]:
-        """テスト用セッションを返す依存関係オーバーライド関数"""
         yield db_session
 
-    # FastAPIアプリの get_session 依存関係をテスト用に差し替える
-    create_app().dependency_overrides[get_session] = _override_get_session
+    app.dependency_overrides[get_session] = _override_get_session
 
-    # httpx.AsyncClient を TestClient として使用
-    app = create_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
-    # テストが終わったらオーバーライドをクリア
-    create_app().dependency_overrides.clear()
-
-@pytest.fixture(scope="function")
-def event_loop():
-    """Create a new event loop for each test."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+    app.dependency_overrides.clear()
