@@ -7,8 +7,6 @@ from src.schemas.record import RecordCreate
 
 pytestmark = pytest.mark.asyncio
 
-# ... (test_create_record_service はそのまま) ...
-
 async def test_create_record_api(test_client: AsyncClient):
     """
     POST /api/v1/records/ が成功し、201と記録データを返すことをテストする。
@@ -58,10 +56,9 @@ async def test_read_record_api_success(test_client: AsyncClient, db_session: Asy
     assert created_record_model.id is not None # IDが採番されていることを確認
 
     # 2. APIエンドポイントを呼び出す
-    #    (まだ存在しないので、ここで 404 Not Found になるはず)
     response = await test_client.get(f"/api/v1/records/{created_record_model.id}")
 
-    # 3. アサーション (レッド！)
+    # 3. アサーション
     assert response.status_code == 200 # 成功時は200 OK
 
     # 4. レスポンスボディのチェック
@@ -96,10 +93,10 @@ async def test_get_record_by_id_service_success(db_session: AsyncSession):
     created_record = await record_service.create_record(db=db_session, record_in=record_to_create)
     assert created_record.id is not None
 
-    # 2. サービス関数を呼び出す（まだ実装されていないので失敗するはず）
+    # 2. サービス関数を呼び出す
     retrieved_record = await record_service.get_record(db=db_session, record_id=created_record.id)
 
-    # 3. アサーション (レッド！)
+    # 3. アサーション
     assert retrieved_record is not None
     assert retrieved_record.id == created_record.id
     assert retrieved_record.exercise == "Overhead Press"

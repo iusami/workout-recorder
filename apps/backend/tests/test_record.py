@@ -28,20 +28,18 @@ async def test_create_record_service(db_session: AsyncSession):
         notes="Felt good",
     )
 
-    # 2. サービス関数を呼び出す（まだ実装されていないので失敗するはず）
+    # 2. サービス関数を呼び出す
     created_record = await record_service.create_record(
         db=db_session, record_in=record_to_create
     )
 
-    # 3. アサーション (レッド！)
-    #    (create_record が pass だと created_record は None なので失敗する)
+    # 3. アサーション
     assert created_record is not None
     assert created_record.id is not None # IDが割り振られているか
     assert created_record.user_id == record_to_create.user_id
     assert created_record.exercise == record_to_create.exercise
 
-    # 4. データベースを直接確認 (レッド！)
-    #    (何も保存されていないので失敗する)
+    # 4. データベースを直接確認
     statement = select(WorkoutRecord).where(WorkoutRecord.id == created_record.id)
     result = await db_session.execute(statement)
     db_record = result.scalar_one_or_none() # 1件だけ取得、なければ None
