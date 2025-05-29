@@ -1,25 +1,22 @@
-import pytest
 import asyncio
-import pytest_asyncio
 from typing import AsyncGenerator
 
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncEngine
-from sqlmodel.ext.asyncio.session import AsyncSession
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.main import create_app
-from src.core.config import settings
 from src.core.database import get_session
+from src.main import create_app
 
-# テスト用DB URLを確定
-TEST_DATABASE_URL = settings.ASYNC_TEST_DATABASE_URL
-if not TEST_DATABASE_URL:
-    pytest.skip("TEST_DATABASE_URL not set, skipping integration tests", allow_module_level=True)
+# テスト用DB URLを確定 (SQLiteを強制使用)
+TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
 
 @pytest.fixture(scope="session")
-def event_loop(): # この session スコープの event_loop を使う
+def event_loop():
     """
     テストセッション全体で単一のイベントループを作成して使用する。
     """
@@ -47,9 +44,18 @@ async def setup_tables(test_engine: AsyncEngine):
     """
     各テストの前にテーブルを再作成するフィクスチャ。
     """
+    # drop_all と create_all を別々のトランザクションで実行
+    try:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(SQLModel.metadata.drop_all)
+    except Exception:
+        # テーブルが存在しない場合やエラーが発生した場合は無視
+        pass
+
+    # 新しいトランザクションでテーブルを作成
     async with test_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
+
     yield
 
 
@@ -77,7 +83,8 @@ async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
 
     app.dependency_overrides[get_session] = _override_get_session
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app),
+                           base_url="http://test") as client:
         yield client
 
     app.dependency_overrides.clear()

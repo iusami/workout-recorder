@@ -1,11 +1,11 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
-from fastapi import HTTPException
+
+from src.core.database import get_session
 
 # 必要なモジュールをインポート
 from src.schemas.record import RecordCreate, RecordRead
 from src.services import record_service
-from src.core.database import get_session
 
 # ルーターの設定を /records に合わせる
 router = APIRouter(
@@ -27,6 +27,22 @@ async def create_record_endpoint(
 
     # 作成された記録を返す
     return created_record
+
+
+@router.get("/", response_model=list[RecordRead], status_code=status.HTTP_200_OK)
+async def read_records_endpoint(
+    # db: AsyncSession = Depends(get_session)
+    skip: int = 0,  # ページネーションのための skip パラメータ (デフォルト0)
+    limit: int = 100,  # ページネーションのための limit パラメータ (デフォルト100)
+):
+    """
+    トレーニング記録の一覧を読み取る（最小限の実装）。
+    """
+    print(f"Received request to read all records with skip={skip}, limit={limit}")
+
+    # --- TDD フェーズ 2: 最小限の実装 ---
+    # まだサービスを呼び出さず、404エラーを回避するために空のリストを返す
+    return []
 
 
 @router.get("/{record_id}", response_model=RecordRead, status_code=status.HTTP_200_OK)

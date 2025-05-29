@@ -1,12 +1,10 @@
 from datetime import date
-from sqlmodel import SQLModel, Field
 from typing import Optional
+
+from sqlmodel import Field, SQLModel
 
 
 class WorkoutRecord(SQLModel, table=True):
-    # SQLModelのテーブル定義として設定
-    # __tablename__ = "workoutrecord" # (オプション) テーブル名を明示的に指定
-
     id: Optional[int] = Field(
         default=None,
         primary_key=True,

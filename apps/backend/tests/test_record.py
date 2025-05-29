@@ -1,15 +1,14 @@
-# apps/backend/tests/test_records.py
+import datetime
 
 import pytest
-from httpx import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select # select をインポート
-import datetime
+
+from src.models.record import WorkoutRecord
+from src.schemas.record import RecordCreate
 
 # サービスとスキーマ/モデルをインポート
 from src.services import record_service
-from src.schemas.record import RecordCreate
-from src.models.record import WorkoutRecord
 
 pytestmark = pytest.mark.asyncio
 
@@ -41,8 +40,8 @@ async def test_create_record_service(db_session: AsyncSession):
 
     # 4. データベースを直接確認
     statement = select(WorkoutRecord).where(WorkoutRecord.id == created_record.id)
-    result = await db_session.execute(statement)
-    db_record = result.scalar_one_or_none() # 1件だけ取得、なければ None
+    result = await db_session.exec(statement)
+    db_record = result.one_or_none() # 1件だけ取得、なければ None
 
     assert db_record is not None
     assert db_record.exercise == "Squat"
