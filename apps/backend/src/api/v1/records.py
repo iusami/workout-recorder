@@ -1,5 +1,6 @@
 from fastapi import APIRouter, status, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
+from fastapi import HTTPException
 
 # 必要なモジュールをインポート
 from src.schemas.record import RecordCreate, RecordRead
@@ -26,3 +27,17 @@ async def create_record_endpoint(
 
     # 作成された記録を返す
     return created_record
+
+
+@router.get("/{record_id}", response_model=RecordRead, status_code=status.HTTP_200_OK)
+async def read_record_endpoint(
+    record_id: int,
+    db: AsyncSession = Depends(get_session),  # DBセッションを有効化
+):
+    """
+    指定されたIDのトレーニング記録を読み取る。
+    """
+    db_record = await record_service.get_record(db=db, record_id=record_id)
+    if db_record is None:
+        raise HTTPException(status_code=404, detail="Workout record not found")
+    return db_record

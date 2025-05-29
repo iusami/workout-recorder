@@ -1,5 +1,7 @@
 # apps/backend/src/services/record_service.py
 
+from typing import Optional
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.schemas.record import RecordCreate
 from src.models.record import WorkoutRecord
@@ -29,3 +31,14 @@ async def create_record(db: AsyncSession, record_in: RecordCreate) -> WorkoutRec
 
     # 5. 作成され、IDが採番されたレコードオブジェクトを返します。
     return db_record
+
+
+async def get_record(db: AsyncSession, record_id: int) -> Optional[WorkoutRecord]:
+    """
+    指定されたIDのトレーニング記録をデータベースから取得する。
+    存在しない場合は None を返す。
+    """
+    statement = select(WorkoutRecord).where(WorkoutRecord.id == record_id)
+    result = await db.exec(statement)
+    record = result.one_or_none()  # 1件取得、なければNone
+    return record
