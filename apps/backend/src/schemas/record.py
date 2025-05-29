@@ -1,6 +1,7 @@
-from pydantic import BaseModel
-from typing import Optional
 import datetime
+from typing import Optional
+
+from pydantic import BaseModel
 
 
 # WorkoutRecord の Config を除いた基本部分を継承

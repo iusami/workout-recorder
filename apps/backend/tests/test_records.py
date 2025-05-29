@@ -1,9 +1,11 @@
 import datetime
-from sqlmodel.ext.asyncio.session import AsyncSession
+
 import pytest
 from httpx import AsyncClient
-from src.services import record_service
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.schemas.record import RecordCreate
+from src.services import record_service
 
 pytestmark = pytest.mark.asyncio
 
@@ -35,7 +37,8 @@ async def test_create_record_api(test_client: AsyncClient):
     assert "id" in response_data # IDが返されているか
     assert response_data["exercise_date"] == record_data["exercise_date"]
 
-async def test_read_record_api_success(test_client: AsyncClient, db_session: AsyncSession):
+async def test_read_record_api_success(test_client: AsyncClient,
+                                       db_session: AsyncSession):
     """
     GET /api/v1/records/{record_id} が成功し、
     指定されたIDの記録データを返すことをテストする。
@@ -90,11 +93,13 @@ async def test_get_record_by_id_service_success(db_session: AsyncSession):
         reps=8,
         set_reps=4
     )
-    created_record = await record_service.create_record(db=db_session, record_in=record_to_create)
+    created_record = await record_service.create_record(db=db_session,
+                                                        record_in=record_to_create)
     assert created_record.id is not None
 
     # 2. サービス関数を呼び出す
-    retrieved_record = await record_service.get_record(db=db_session, record_id=created_record.id)
+    retrieved_record = await record_service.get_record(db=db_session,
+                                                       record_id=created_record.id)
 
     # 3. アサーション
     assert retrieved_record is not None
@@ -106,6 +111,91 @@ async def test_get_record_by_id_service_not_found(db_session: AsyncSession):
     存在しないIDで record_service.get_record を呼び出すと None が返ることをテストする。
     """
     non_existent_id = 99998
-    retrieved_record = await record_service.get_record(db=db_session, record_id=non_existent_id)
+    retrieved_record = await record_service.get_record(db=db_session,
+                                                       record_id=non_existent_id)
 
     assert retrieved_record is None
+
+async def test_read_records_api_success(test_client: AsyncClient,
+                                        db_session: AsyncSession):
+    """
+    GET /api/v1/records/ が成功し、記録のリストを返すことをテストする。
+    """
+    # 1. 事前に複数のテストデータをDBに作成
+    record1_data = RecordCreate(
+        user_id=1,
+        exercise_date=datetime.date(2025, 6, 1),
+        exercise="Push Up",
+        weight=0,
+        reps=20,
+        set_reps=3,
+        notes="Record 1"
+    )
+    record2_data = RecordCreate(
+        user_id=1,
+        exercise_date=datetime.date(2025, 6, 2),
+        exercise="Pull Up",
+        weight=0,
+        reps=10,
+        set_reps=3,
+        notes="Record 2"
+    )
+    await record_service.create_record(db=db_session, record_in=record1_data)
+    await record_service.create_record(db=db_session, record_in=record2_data)
+
+    # 2. APIエンドポイントを呼び出す
+    response = await test_client.get("/api/v1/records/")
+
+    # 3. アサーション
+    assert response.status_code == 200 # 成功時は200 OK
+
+    # 4. レスポンスボディのチェック
+    response_data = response.json()
+    assert isinstance(response_data, list) # リスト形式であること
+    assert len(response_data) == 2         # 作成した2件の記録が返ってくること
+
+    # (オプション) リストの中身も簡単にチェック
+    assert response_data[0]["exercise"] == record1_data.exercise
+    assert response_data[1]["exercise"] == record2_data.exercise
+
+async def test_get_records_service(db_session: AsyncSession):
+    """
+    record_service.get_records が記録のリストを正しく取得できることをテストする。
+    """
+    # 1. 複数のテストデータを作成
+    record1_data = RecordCreate(user_id=1, 
+                                exercise_date=datetime.date(2025, 6, 3), exercise="Dip",
+                                weight=10,
+                                reps=15,
+                                set_reps=3)
+    record2_data = RecordCreate(user_id=1,
+                                exercise_date=datetime.date(2025, 6, 4),
+                                exercise="Leg Press",
+                                weight=150,
+                                reps=12,
+                                set_reps=3)
+    await record_service.create_record(db=db_session, record_in=record1_data)
+    await record_service.create_record(db=db_session, record_in=record2_data)
+
+    # 2. サービス関数を呼び出す
+    retrieved_records = await record_service.get_records(db=db_session,
+                                                         skip=0,
+                                                         limit=10)
+
+    # 3. アサーション
+    assert retrieved_records is not None
+    assert isinstance(retrieved_records, list)
+    assert len(retrieved_records) == 2
+    assert retrieved_records[0].exercise == "Dip"
+    assert retrieved_records[1].exercise == "Leg Press"
+
+    # (オプション) skip と limit のテストも追加するとより堅牢
+    limited_records = await record_service.get_records(db=db_session,
+                                                       skip=0,
+                                                       limit=1)
+    assert len(limited_records) == 1
+    skipped_records = await record_service.get_records(db=db_session,
+                                                       skip=1,
+                                                       limit=1)
+    assert len(skipped_records) == 1
+    assert skipped_records[0].exercise == "Leg Press" # 2番目の記録のはず

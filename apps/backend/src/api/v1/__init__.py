@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from . import records
 
 api_router_v1 = APIRouter(prefix="/v1")

@@ -1,10 +1,12 @@
 # apps/backend/src/services/record_service.py
 
 from typing import Optional
+
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.schemas.record import RecordCreate
+
 from src.models.record import WorkoutRecord
+from src.schemas.record import RecordCreate
 
 
 async def create_record(db: AsyncSession, record_in: RecordCreate) -> WorkoutRecord:
@@ -42,3 +44,16 @@ async def get_record(db: AsyncSession, record_id: int) -> Optional[WorkoutRecord
     result = await db.exec(statement)
     record = result.one_or_none()  # 1件取得、なければNone
     return record
+
+
+async def get_records(
+    db: AsyncSession, skip: int = 0, limit: int = 100
+) -> list[WorkoutRecord]:
+    """
+    トレーニング記録の一覧をデータベースから取得する。
+    skip と limit を使ってページネーションをサポートする。
+    """
+    statement = select(WorkoutRecord).offset(skip).limit(limit)
+    result = await db.exec(statement)
+    records = result.all()
+    return list(records)
