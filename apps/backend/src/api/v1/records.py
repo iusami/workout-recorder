@@ -31,18 +31,15 @@ async def create_record_endpoint(
 
 @router.get("/", response_model=list[RecordRead], status_code=status.HTTP_200_OK)
 async def read_records_endpoint(
-    # db: AsyncSession = Depends(get_session)
-    skip: int = 0,  # ページネーションのための skip パラメータ (デフォルト0)
-    limit: int = 100,  # ページネーションのための limit パラメータ (デフォルト100)
+    db: AsyncSession = Depends(get_session),
+    skip: int = 0,
+    limit: int = 100,
 ):
     """
-    トレーニング記録の一覧を読み取る（最小限の実装）。
+    トレーニング記録の一覧を読み取る。
     """
-    print(f"Received request to read all records with skip={skip}, limit={limit}")
-
-    # --- TDD フェーズ 2: 最小限の実装 ---
-    # まだサービスを呼び出さず、404エラーを回避するために空のリストを返す
-    return []
+    records = await record_service.get_records(db=db, skip=skip, limit=limit)
+    return records
 
 
 @router.get("/{record_id}", response_model=RecordRead, status_code=status.HTTP_200_OK)

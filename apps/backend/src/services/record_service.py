@@ -45,9 +45,10 @@ async def get_record(db: AsyncSession, record_id: int) -> Optional[WorkoutRecord
     record = result.one_or_none()  # 1件取得、なければNone
     return record
 
-async def get_records(db: AsyncSession,
-                      skip: int = 0,
-                      limit: int = 100) -> list[WorkoutRecord]:
+
+async def get_records(
+    db: AsyncSession, skip: int = 0, limit: int = 100
+) -> list[WorkoutRecord]:
     """
     トレーニング記録の一覧をデータベースから取得する。
     skip と limit を使ってページネーションをサポートする。
