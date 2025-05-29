@@ -177,12 +177,12 @@ async def test_get_records_service(db_session: AsyncSession):
     await record_service.create_record(db=db_session, record_in=record1_data)
     await record_service.create_record(db=db_session, record_in=record2_data)
 
-    # 2. サービス関数を呼び出す（まだ実装されていないので失敗するはず）
+    # 2. サービス関数を呼び出す
     retrieved_records = await record_service.get_records(db=db_session,
                                                          skip=0,
                                                          limit=10)
 
-    # 3. アサーション (レッド！)
+    # 3. アサーション
     assert retrieved_records is not None
     assert isinstance(retrieved_records, list)
     assert len(retrieved_records) == 2

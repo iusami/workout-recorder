@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -48,9 +49,10 @@ async def setup_tables(test_engine: AsyncEngine):
     try:
         async with test_engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.drop_all)
-    except Exception:
-        # テーブルが存在しない場合やエラーが発生した場合は無視
-        pass
+    except (ProgrammingError, OperationalError) as e:
+        # テーブルが存在しない場合の特定のエラーのみ無視
+        # エラーの内容をログに出力することも検討
+        print(f"テーブル削除中のエラーを無視します: {e}")
 
     # 新しいトランザクションでテーブルを作成
     async with test_engine.begin() as conn:
