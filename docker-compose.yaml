@@ -6,7 +6,7 @@ services:
       - postgres_data:/var/lib/postgresql/data/
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     environment:
-      POSTGRES_USER: postgres
+      POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: workout-recorder
     ports:
