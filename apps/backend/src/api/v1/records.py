@@ -73,3 +73,22 @@ async def update_record_endpoint(
             status_code=404, detail='Workout record not found to update'
         )
     return updated_record
+
+
+@router.delete('/{record_id}', response_model=RecordRead, status_code=status.HTTP_200_OK)
+async def delete_record_endpoint(
+    record_id: int,
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    指定されたIDのトレーニング記録を削除する。
+    成功した場合は削除された記録オブジェクトを返す。
+    記録が見つからない場合は404エラーを返す。
+    """
+    deleted_record = await record_service.delete_record(db=db, record_id=record_id)
+    if deleted_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Workout record not found to delete',
+        )
+    return deleted_record
