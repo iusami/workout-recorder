@@ -75,7 +75,7 @@ async def test_register_user_api_success(test_client: AsyncClient):
 
     response = await test_client.post("/api/v1/auth/register", json=user_payload)
 
-    assert response.status_code == 201 # レッド！ (404のはず)
+    assert response.status_code == 201
     
     response_data = response.json()
     assert response_data["email"] == user_payload["email"]
