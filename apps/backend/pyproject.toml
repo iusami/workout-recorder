@@ -16,6 +16,7 @@ dependencies = [
     "pydantic-settings>=2.9.1",
     "sqlalchemy>=2.0.41",
     "sqlmodel>=0.0.24",
+    "types-passlib>=1.7.7.20250516",
     "uvicorn>=0.34.2",
 ]
 

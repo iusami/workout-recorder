@@ -1,3 +1,13 @@
+import os
+import sys
+
+# Add project root to sys.path
+# Assuming env.py is in apps/backend/alembic, to get to apps/backend:
+alembic_dir = os.path.dirname(__file__)
+project_root = os.path.abspath(os.path.join(alembic_dir, ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root) # Insert at the beginning
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -59,7 +69,14 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL))
+
+    db_url_for_alembic = settings.ASYNC_DATABASE_URL
+    if "postgresql+asyncpg://" in db_url_for_alembic:
+        db_url_for_alembic = db_url_for_alembic.replace("postgresql+asyncpg://", "postgresql://")
+    elif "postgresql+asyncpg:" in db_url_for_alembic: # DSN style without //
+        db_url_for_alembic = db_url_for_alembic.replace("postgresql+asyncpg:", "postgresql:")
+
+    config.set_main_option("sqlalchemy.url", db_url_for_alembic)
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

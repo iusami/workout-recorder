@@ -330,7 +330,7 @@ async def test_delete_record_service_success(db_session: AsyncSession):
 
 async def test_delete_record_service_not_found(db_session: AsyncSession):
     """
-    存在しないIDで record_service.delete_record を呼び出すと None が返ることをテストする。
+    存在しないIDで record_service.delete_record を呼び出すと None が返ることをテスト
     """
     non_existent_id = 99999
     deleted_record = await record_service.delete_record(db=db_session,

@@ -75,7 +75,9 @@ async def update_record_endpoint(
     return updated_record
 
 
-@router.delete('/{record_id}', response_model=RecordRead, status_code=status.HTTP_200_OK)
+@router.delete(
+    '/{record_id}', response_model=RecordRead, status_code=status.HTTP_200_OK
+)
 async def delete_record_endpoint(
     record_id: int,
     db: AsyncSession = Depends(get_session),

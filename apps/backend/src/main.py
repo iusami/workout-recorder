@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from src.api.v1 import api_router_v1
 from src.core.logger import setup_logger
 
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title='Workout Recorder API',
