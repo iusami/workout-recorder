@@ -90,6 +90,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
     { name = "sqlmodel" },
+    { name = "types-passlib" },
     { name = "uvicorn" },
 ]
 
@@ -115,6 +116,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.9.1" },
     { name = "sqlalchemy", specifier = ">=2.0.41" },
     { name = "sqlmodel", specifier = ">=0.0.24" },
+    { name = "types-passlib", specifier = ">=1.7.7.20250516" },
     { name = "uvicorn", specifier = ">=0.34.2" },
 ]
 
@@ -898,6 +900,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c5/8c/7d682431efca5fd290017663ea4588bf6f2c6aad085c7f108c5dbc316e70/typer-0.16.0.tar.gz", hash = "sha256:af377ffaee1dbe37ae9440cb4e8f11686ea5ce4e9bae01b84ae7c63b87f1dd3b", size = 102625 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/42/3efaf858001d2c2913de7f354563e3a3a2f0decae3efe98427125a8f441e/typer-0.16.0-py3-none-any.whl", hash = "sha256:1f79bed11d4d02d4310e3c1b7ba594183bcedb0ac73b27a9e5f28f6fb5b98855", size = 46317 },
+]
+
+[[package]]
+name = "types-passlib"
+version = "1.7.7.20250516"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/bb/901b2c4b7a4c265b4a5caf504670c442d31a05aa6eb0e3c30731fa1965cd/types_passlib-1.7.7.20250516.tar.gz", hash = "sha256:f0175da758ab18b4e4c0859b735e7921992b8af95883694402a6bdb7a1c7cce7", size = 25058 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/3e/52ad4db9ad3717f02b0607c814ef936273b0719b30efd95e630bc8c7b5b4/types_passlib-1.7.7.20250516-py3-none-any.whl", hash = "sha256:0846c3d55e62a4a7e1a72094fb3e46d320cb42c4c8a817768d656955920edf73", size = 39927 },
 ]
 
 [[package]]
