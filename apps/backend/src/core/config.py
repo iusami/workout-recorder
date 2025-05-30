@@ -7,49 +7,49 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    アプリケーションの設定を管理するクラス。
-    環境変数または .env ファイルから読み込みます。
-    """
+	"""
+	アプリケーションの設定を管理するクラス。
+	環境変数または .env ファイルから読み込みます。
+	"""
 
-    # .env ファイルから読み込む設定
-    # env_file をワークスペースルートに設定
-    model_config = SettingsConfigDict(
-        env_file=str(Path(__file__).parent.parent.parent.parent.parent / ".env"),
-        env_file_encoding="utf-8",
-    )
+	# .env ファイルから読み込む設定
+	# env_file をワークスペースルートに設定
+	model_config = SettingsConfigDict(
+		env_file=str(Path(__file__).parent.parent.parent.parent.parent / '.env'),
+		env_file_encoding='utf-8',
+	)
 
-    # データベースURL (PostgreSQL または SQLite)
-    # CI環境ではSQLiteを使用
-    DATABASE_URL: str = (
-        "sqlite+aiosqlite:///./test.db" if os.environ.get("CI") else Field(...)
-    )
+	# データベースURL (PostgreSQL または SQLite)
+	# CI環境ではSQLiteを使用
+	DATABASE_URL: str = (
+		'sqlite+aiosqlite:///./test.db' if os.environ.get('CI') else Field(...)
+	)
 
-    # テスト用データベースURL (環境変数 TEST_DATABASE_URL がなければ None)
-    # CI環境ではSQLiteを使用
-    TEST_DATABASE_URL: Optional[str] = Field(
-        default="sqlite+aiosqlite:///./test.db" if os.environ.get("CI") else None
-    )
+	# テスト用データベースURL (環境変数 TEST_DATABASE_URL がなければ None)
+	# CI環境ではSQLiteを使用
+	TEST_DATABASE_URL: Optional[str] = Field(
+		default='sqlite+aiosqlite:///./test.db' if os.environ.get('CI') else None
+	)
 
-    # 非同期DB接続用のURLを生成するプロパティ
-    @property
-    def ASYNC_DATABASE_URL(self) -> str:
-        # Pydantic v2 では str() を使う
-        url = str(self.DATABASE_URL)
-        # PostgreSQLの場合のみasyncpgに変換
-        if url.startswith("postgresql://"):
-            return url.replace("postgresql://", "postgresql+asyncpg://")
-        return url
+	# 非同期DB接続用のURLを生成するプロパティ
+	@property
+	def ASYNC_DATABASE_URL(self) -> str:
+		# Pydantic v2 では str() を使う
+		url = str(self.DATABASE_URL)
+		# PostgreSQLの場合のみasyncpgに変換
+		if url.startswith('postgresql://'):
+			return url.replace('postgresql://', 'postgresql+asyncpg://')
+		return url
 
-    @property
-    def ASYNC_TEST_DATABASE_URL(self) -> Optional[str]:
-        if self.TEST_DATABASE_URL:
-            url = str(self.TEST_DATABASE_URL)
-            # PostgreSQLの場合のみasyncpgに変換
-            if url.startswith("postgresql://"):
-                return url.replace("postgresql://", "postgresql+asyncpg://")
-            return url
-        return None
+	@property
+	def ASYNC_TEST_DATABASE_URL(self) -> Optional[str]:
+		if self.TEST_DATABASE_URL:
+			url = str(self.TEST_DATABASE_URL)
+			# PostgreSQLの場合のみasyncpgに変換
+			if url.startswith('postgresql://'):
+				return url.replace('postgresql://', 'postgresql+asyncpg://')
+			return url
+		return None
 
 
 # 設定クラスのインスタンスを作成 (アプリケーション全体で共有)
