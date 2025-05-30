@@ -83,3 +83,16 @@ async def update_record(
     await db.refresh(db_record)  # DBから最新情報を再読み込み
 
     return db_record
+
+
+async def delete_record(db: AsyncSession, record_id: int) -> Optional[WorkoutRecord]:
+    """
+    指定されたIDのトレーニング記録をデータベースから削除する。
+    成功した場合は削除されたレコードオブジェクトを、見つからない場合はNoneを返す。
+    """
+    record_object = await get_record(db=db, record_id=record_id)
+    if record_object:
+        await db.delete(record_object)
+        await db.commit()
+        return record_object
+    return None

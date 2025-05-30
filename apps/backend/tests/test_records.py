@@ -290,3 +290,102 @@ async def test_update_record_service_not_found(db_session: AsyncSession):
         db=db_session, record_id=non_existent_id, record_update=update_data
     )
     assert updated_record is None
+
+
+async def test_delete_record_service_success(db_session: AsyncSession):
+    """
+    record_service.delete_record が指定されたIDの記録を正しく削除し、
+    削除されたオブジェクトを返すことをテストする。
+    その後、get_record で取得できないことも確認する。
+    """
+    # 1. テストデータを作成・保存
+    record_to_create = RecordCreate(
+        user_id=1,
+        exercise_date=datetime.date(2025, 1, 1),
+        exercise="Test Exercise for Deletion",
+        weight=50.0,
+        reps=10,
+        set_reps=3
+    )
+    created_record = await record_service.create_record(db=db_session,
+                                                        record_in=record_to_create)
+    assert created_record.id is not None
+    created_record_id = created_record.id # IDを保存しておく
+
+    # 2. サービス関数 delete_record を呼び出す
+    deleted_record = await record_service.delete_record(db=db_session,
+                                                        record_id=created_record_id)
+
+    # 3. アサーション (delete_record の返り値)
+    assert deleted_record is not None
+    assert deleted_record.id == created_record_id
+    assert deleted_record.exercise == "Test Exercise for Deletion"
+    assert deleted_record.user_id == 1
+
+    # 4. 削除されたことを確認 (get_record で取得できない)
+    record_after_deletion = await record_service.get_record(db=db_session,
+                                                            record_id=created_record_id)
+    assert record_after_deletion is None
+
+
+async def test_delete_record_service_not_found(db_session: AsyncSession):
+    """
+    存在しないIDで record_service.delete_record を呼び出すと None が返ることをテストする。
+    """
+    non_existent_id = 99999
+    deleted_record = await record_service.delete_record(db=db_session,
+                                                        record_id=non_existent_id)
+
+    assert deleted_record is None
+
+
+async def test_delete_record_api_success(test_client: AsyncClient,
+                                         db_session: AsyncSession):
+    """
+    DELETE /api/v1/records/{record_id} が成功し、
+    削除された記録データを返し、実際にDBから削除されることをテストする。
+    """
+    # 1. 事前にテストデータをDBに作成 (サービス層を直接利用)
+    record_to_create = RecordCreate(
+        user_id=10, # APIテスト用に別のユーザーIDなどを使うと区別しやすい
+        exercise_date=datetime.date(2025, 12, 25),
+        exercise="API Delete Test Exercise",
+        weight=77.7,
+        reps=7,
+        set_reps=1,
+        notes="To be deleted via API",
+    )
+    created_record = await record_service.create_record(db=db_session,
+                                                        record_in=record_to_create)
+    assert created_record.id is not None
+    created_record_id = created_record.id
+
+    # 2. APIエンドポイントを呼び出す
+    response = await test_client.delete(f"/api/v1/records/{created_record_id}")
+
+    # 3. アサーション (レスポンス)
+    assert response.status_code == 200 # 成功時は200 OK (FastAPIのstatus.HTTP_200_OK)
+
+    response_data = response.json()
+    assert response_data["id"] == created_record_id
+    assert response_data["exercise"] == "API Delete Test Exercise"
+    assert response_data["user_id"] == 10
+    assert response_data["weight"] == 77.7
+
+    # 4. DBから実際に削除されたことを確認 (サービス層を利用)
+    record_in_db = await record_service.get_record(db=db_session,
+                                                   record_id=created_record_id)
+    assert record_in_db is None
+
+
+async def test_delete_record_api_not_found(test_client: AsyncClient):
+    """
+    存在しないIDの記録をDELETEしようとした場合、404 Not Foundが返ることをテストする。
+    """
+    non_existent_id = 99998 # 既存のテストと重複しないID
+    response = await test_client.delete(f"/api/v1/records/{non_existent_id}")
+
+    assert response.status_code == 404 # FastAPIのstatus.HTTP_404_NOT_FOUND
+    # Optional: detailメッセージの確認も可能
+    # response_data = response.json()
+    # assert response_data["detail"] == "Workout record not found to delete"
