@@ -4,7 +4,7 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.schemas.record import RecordCreate
+from src.schemas.record import RecordCreate, RecordUpdate
 from src.services import record_service
 
 pytestmark = pytest.mark.asyncio
@@ -199,3 +199,94 @@ async def test_get_records_service(db_session: AsyncSession):
                                                        limit=1)
     assert len(skipped_records) == 1
     assert skipped_records[0].exercise == "Leg Press" # 2番目の記録のはず
+
+async def test_update_record_api_success(test_client: AsyncClient,
+                                         db_session: AsyncSession):
+    """
+    PUT /api/v1/records/{record_id} が成功し、
+    更新された記録データを返すことをテストする。
+    """
+    # 1. 事前にテストデータをDBに作成
+    initial_data = RecordCreate(
+        user_id=1, exercise_date=datetime.date(2025, 7, 1), exercise="Squat",
+        weight=100.0, reps=5, set_reps=3, notes="Initial Notes"
+    )
+    created_record = await record_service.create_record(db=db_session,
+                                                        record_in=initial_data)
+    assert created_record.id is not None
+
+    # 2. 更新用データを作成 (例: notes と weight を変更)
+    update_payload = {
+        "notes": "Updated notes after feeling stronger!",
+        "weight": 102.5
+    }
+
+    # 3. APIエンドポイントを呼び出す
+    response = await test_client.put(f"/api/v1/records/{created_record.id}",
+                                    json=update_payload)
+
+    # 4. アサーション
+    assert response.status_code == 200 # 成功時は200 OK
+
+    response_data = response.json()
+    assert response_data["id"] == created_record.id
+    assert response_data["notes"] == update_payload["notes"] # 更新されたフィールド
+    assert response_data["weight"] == update_payload["weight"] # 更新されたフィールド
+    assert response_data["exercise"] == initial_data.exercise
+
+async def test_update_record_api_not_found(test_client: AsyncClient):
+    """
+    存在しないIDの記録を更新しようとした場合、404 Not Foundが返ることをテストする。
+    """
+    non_existent_id = 99997
+    update_payload = {"notes": "This should fail"}
+    response = await test_client.put(f"/api/v1/records/{non_existent_id}",
+                                     json=update_payload)
+
+    assert response.status_code == 404
+
+async def test_update_record_service_success(db_session: AsyncSession):
+    """
+    record_service.update_record が指定されたIDの記録を
+    正しく更新できることをテストする。
+    """
+    # 1. 初期データを作成・保存
+    initial_record_data = RecordCreate(
+        user_id=3,
+        exercise_date=datetime.date(2025, 7, 2),
+        exercise="Bench Press",
+        weight=90.0,
+        reps=6,
+        set_reps=3,
+        notes="Initial state"
+    )
+    initial_record = await record_service.create_record(db=db_session,
+                                                        record_in=initial_record_data)
+    assert initial_record.id is not None
+
+    # 2. 更新用データを作成 (一部のフィールドのみ)
+    update_data = RecordUpdate(notes="Felt a bit tired", reps=5)
+
+    # 3. サービス関数を呼び出す
+    updated_record = await record_service.update_record(
+        db=db_session, record_id=initial_record.id, record_update=update_data
+    )
+
+    # 4. アサーション
+    assert updated_record is not None
+    assert updated_record.id == initial_record.id
+    assert updated_record.notes == "Felt a bit tired" # 更新された
+    assert updated_record.reps == 5                 # 更新された
+    assert updated_record.weight == 90.0            # 更新していないので元のまま
+    assert updated_record.exercise == "Bench Press" # 更新していないので元のまま
+
+async def test_update_record_service_not_found(db_session: AsyncSession):
+    """
+    存在しないIDの記録を record_service.update_record で更新しようとすると None が返る。
+    """
+    non_existent_id = 99996
+    update_data = RecordUpdate(notes="This should not apply")
+    updated_record = await record_service.update_record(
+        db=db_session, record_id=non_existent_id, record_update=update_data
+    )
+    assert updated_record is None
