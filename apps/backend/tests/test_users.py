@@ -1,14 +1,15 @@
-# apps/backend/tests/test_users.py
-
 import pytest
 from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from jose import jwt
 
 from src.core.security import hash_password, verify_password
 from src.models.user import User
 from src.schemas.user import UserCreate
 from src.services import user_service
+from src.core.config import settings
+
 
 pytestmark = pytest.mark.asyncio
 
@@ -188,3 +189,65 @@ async def test_authenticate_user_failure_inactive_user(db_session: AsyncSession)
     )
 
     assert authenticated_user is None
+
+async def test_login_for_access_token_success(test_client: AsyncClient,
+                                              db_session: AsyncSession):
+    """
+    正しい認証情報で /token エンドポイントを呼び出すと、
+    アクセストークンが返されることをテストする。
+    """
+    # 1. テスト用ユーザーを作成
+    email = "login_test@example.com"
+    password = "login_password123"
+    user_create_data = UserCreate(email=email,
+                                  username="logintester",
+                                  password=password)
+    await user_service.create_user(db=db_session, user_in=user_create_data)
+
+    # 2. ログインリクエスト (フォームデータとして送信)
+    login_payload = {
+        "username": email, # OAuth2PasswordRequestForm は 'username' フィールドを期待
+        "password": password
+    }
+    # HTTPX TestClient では、フォームデータは `data` パラメータで送信
+    response = await test_client.post("/api/v1/auth/token", data=login_payload)
+
+    # 3. アサーション
+    assert response.status_code == 200 # ログイン成功時は200 OK
+
+    token_data = response.json()
+    assert "access_token" in token_data
+    assert token_data["token_type"] == "bearer"
+
+    # (オプション) トークンの中身をデコードして確認
+    decoded_token = jwt.decode(
+        token_data["access_token"], settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+    )
+    assert decoded_token["sub"] == email # 'sub' (subject) がメールアドレスと一致するか
+    assert "exp" in decoded_token # 有効期限が含まれているか
+
+async def test_login_for_access_token_failure_wrong_password(test_client: AsyncClient,
+                                                             db_session: AsyncSession):
+    """
+    間違ったパスワードでログインしようとすると 401 Unauthorized が返ることをテストする。
+    """
+    email = "login_wrong_pw@example.com"
+    correct_password = "correct_password"
+    wrong_password = "thisiswrong"
+    user_create_data = UserCreate(email=email, username="loginwrongpw_user",
+                                  password=correct_password)
+    await user_service.create_user(db=db_session, user_in=user_create_data)
+
+    login_payload = {"username": email, "password": wrong_password}
+    response = await test_client.post("/api/v1/auth/token", data=login_payload)
+
+    assert response.status_code == 401
+
+async def test_login_for_access_token_failure_user_not_exist(test_client: AsyncClient):
+    """
+    存在しないユーザーでログインしようとすると 401 Unauthorized が返ることをテストする。
+    """
+    login_payload = {"username": "nosuchuser@example.com", "password": "anypassword"}
+    response = await test_client.post("/api/v1/auth/token", data=login_payload)
+
+    assert response.status_code == 401
