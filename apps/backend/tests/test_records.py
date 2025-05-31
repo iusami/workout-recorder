@@ -406,7 +406,7 @@ async def test_create_record_api_no_token(test_client: AsyncClient):
     POST /api/v1/records/ にトークンなしでアクセスすると 401 Unauthorized が返る。
     """
     record_payload = {
-        "date": "2025-07-03",
+        "exercise_date": "2025-07-03",
         "exercise": "Overhead Press",
         "weight": 50.0,
         "reps": 5,
