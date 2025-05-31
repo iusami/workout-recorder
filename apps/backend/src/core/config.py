@@ -31,7 +31,14 @@ class Settings(BaseSettings):
         default='sqlite+aiosqlite:///./test.db' if os.environ.get('CI') else None
     )
 
-    LOG_LEVEL: str = Field(default='INFO')  # デフォルトは INFO
+    LOG_LEVEL: str = Field(default='INFO')
+
+    # トークン署名に使用する秘密鍵 (非常に重要。複雑でランダムな文字列にしてください)
+    SECRET_KEY: str = Field(..., alias='SECRET_KEY')
+    # トークン署名アルゴリズム
+    ALGORITHM: str = Field('HS256', alias='ALGORITHM')
+    # アクセストークンの有効期間 (分単位)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30, alias='ACCESS_TOKEN_EXPIRE_MINUTES')
 
     # 非同期DB接続用のURLを生成するプロパティ
     @property
