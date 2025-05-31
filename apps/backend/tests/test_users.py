@@ -162,7 +162,7 @@ async def test_authenticate_user_failure_user_not_found(db_session: AsyncSession
         password="anypassword"
     )
 
-    assert authenticated_user is None # レッド！
+    assert authenticated_user is None
 
 async def test_authenticate_user_failure_inactive_user(db_session: AsyncSession):
     """
