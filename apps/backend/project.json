@@ -28,7 +28,7 @@
     "check":{
       "executor": "nx:run-commands",
       "options": {
-        "command": "uv run ruff check src",
+        "command": "uv run ruff check src --fix",
         "cwd": "apps/backend"
       }
     },

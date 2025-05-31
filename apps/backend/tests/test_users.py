@@ -74,10 +74,10 @@ async def test_register_user_api_success(test_client: AsyncClient):
         "password": "securepasswordAPI123"
     }
 
-    response = await test_client.post("/api/v1/auth/register", json=user_payload)
+    response = await test_client.post("/api/v1/users/", json=user_payload)
 
     assert response.status_code == 201
-    
+
     response_data = response.json()
     assert response_data["email"] == user_payload["email"]
     assert response_data["username"] == user_payload["username"]
@@ -101,7 +101,7 @@ async def test_register_user_api_duplicate_email(test_client: AsyncClient,
     duplicate_payload = {"email": "taken@example.com",
                          "username": "another_user",
                          "password": "password2"}
-    response = await test_client.post("/api/v1/auth/register", json=duplicate_payload)
+    response = await test_client.post("/api/v1/users/", json=duplicate_payload)
 
     assert response.status_code == 400
     response_data = response.json()
@@ -250,4 +250,60 @@ async def test_login_for_access_token_failure_user_not_exist(test_client: AsyncC
     login_payload = {"username": "nosuchuser@example.com", "password": "anypassword"}
     response = await test_client.post("/api/v1/auth/token", data=login_payload)
 
+    assert response.status_code == 401
+
+async def test_read_current_user_success(test_client: AsyncClient,
+                                         db_session: AsyncSession):
+    """
+    有効なトークンで /users/me にアクセスすると、
+    現在のユーザー情報が返されることをテストする。
+    """
+    # 1. テスト用ユーザーを作成し、ログインしてトークンを取得
+    email = "me_user@example.com"
+    password = "secure_password_for_me"
+    username = "me_user_test"
+    user_create_data = UserCreate(email=email, username=username, password=password)
+
+    # サービスを直接呼んでユーザー作成 (テストの独立性のため)
+    created_user = await user_service.create_user(db=db_session,
+                                                  user_in=user_create_data)
+    assert created_user is not None # 作成確認
+
+    # ログインしてトークン取得
+    login_payload = {"username": email, "password": password}
+    login_response = await test_client.post("/api/v1/auth/token", data=login_payload)
+    assert login_response.status_code == 200
+    token = login_response.json()["access_token"]
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. /users/me エンドポイントを呼び出す
+    response = await test_client.get("/api/v1/users/me", headers=headers)
+
+    # 3. アサーション
+    assert response.status_code == 200 # 成功時は200 OK
+
+    response_data = response.json()
+    assert response_data["email"] == email
+    assert response_data["username"] == username
+    assert response_data["id"] == created_user.id # IDも一致するはず
+    assert "hashed_password" not in response_data # パスワードは含まれない
+    assert response_data["is_active"] is True
+
+async def test_read_current_user_no_token(test_client: AsyncClient):
+    """
+    トークンなしで /users/me にアクセスすると 401 Unauthorized が返ることをテストする。
+    """
+    response = await test_client.get("/api/v1/users/me")
+    # エンドポイントが存在しない初期段階では404だが、最終的には401を期待
+    assert response.status_code == 401 # レッド！
+
+async def test_read_current_user_invalid_token(test_client: AsyncClient):
+    """
+    無効なトークンで /users/me にアクセスすると、
+    401 Unauthorized が返ることをテストする。
+    """
+    headers = {"Authorization": "Bearer invalidtokenstring"}
+    response = await test_client.get("/api/v1/users/me", headers=headers)
+    # エンドポイントが存在しない初期段階では404だが、最終的には401を期待
     assert response.status_code == 401
