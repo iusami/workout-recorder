@@ -295,8 +295,8 @@ async def test_read_current_user_no_token(test_client: AsyncClient):
     トークンなしで /users/me にアクセスすると 401 Unauthorized が返ることをテストする。
     """
     response = await test_client.get("/api/v1/users/me")
-    # エンドポイントが存在しない初期段階では404だが、最終的には401を期待
-    assert response.status_code == 401 # レッド！
+
+    assert response.status_code == 401 
 
 async def test_read_current_user_invalid_token(test_client: AsyncClient):
     """
@@ -305,5 +305,5 @@ async def test_read_current_user_invalid_token(test_client: AsyncClient):
     """
     headers = {"Authorization": "Bearer invalidtokenstring"}
     response = await test_client.get("/api/v1/users/me", headers=headers)
-    # エンドポイントが存在しない初期段階では404だが、最終的には401を期待
+
     assert response.status_code == 401
