@@ -1,10 +1,25 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from fastapi import HTTPException, status
 from jose import jwt
+from jose.exceptions import ExpiredSignatureError, JWTError
 from passlib.context import CryptContext
 
 from src.core.config import settings
+
+# トークン検証失敗時のための共通例外
+CREDENTIALS_EXCEPTION = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail='Could not validate credentials',
+    headers={'WWW-Authenticate': 'Bearer'},  # OAuth2標準のレスポンスヘッダー
+)
+
+EXPIRED_TOKEN_EXCEPTION = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail='Token has expired',
+    headers={'WWW-Authenticate': 'Bearer'},
+)
 
 # パスワードハッシュ化のコンテキストを設定 (bcrypt を使用)
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
@@ -44,3 +59,27 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
     )
     return encoded_jwt
+
+
+def decode_access_token(token: str) -> str:
+    """
+    アクセストークンをデコードし、ペイロードから subject (ユーザー識別子) を抽出する。
+    検証に失敗した場合は HTTPException を発生させる。
+    """
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        # "sub" (subject) クレームを取得
+        subject: Optional[str] = payload.get('sub')
+        if subject is None:
+            # subject がペイロードに含まれない、または None の場合は不正なトークン
+            raise CREDENTIALS_EXCEPTION
+
+        return subject
+    except ExpiredSignatureError as exc:
+        # トークンの有効期限切れ
+        raise EXPIRED_TOKEN_EXCEPTION from exc
+    except JWTError as exc:
+        # その他のJWT関連エラー (署名不正など)
+        raise CREDENTIALS_EXCEPTION from exc
