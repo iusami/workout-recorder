@@ -1,22 +1,29 @@
 # apps/backend/src/services/record_service.py
 
+import logging
 from typing import Optional
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.core.logger import APP_LOGGER_NAME
 from src.models.record import WorkoutRecord
 from src.schemas.record import RecordCreate, RecordUpdate
 
+logger = logging.getLogger(APP_LOGGER_NAME)
 
-async def create_record(db: AsyncSession, record_in: RecordCreate) -> WorkoutRecord:
+
+async def create_record(db: AsyncSession, record_in: RecordCreate, user_id: int) -> WorkoutRecord:
     """
     新しいトレーニング記録を作成し、データベースに保存する。
     """
+
+    logger.info('Creating new workout record for user_id: %s, exercise: %s', user_id, record_in.exercise)
     # 1. 入力スキーマ (RecordCreate) から
     #    データベースモデル (WorkoutRecord) のインスタンスを作成します。
     #    Pydantic V2 では model_validate() を使います。
-    db_record = WorkoutRecord.model_validate(record_in)
+    record_data = record_in.model_dump()
+    db_record = WorkoutRecord(**record_data, user_id=user_id)
 
     # 2. 作成したインスタンスをデータベースセッションに追加します。
     #    この時点ではまだDBには保存されていません。
@@ -31,6 +38,7 @@ async def create_record(db: AsyncSession, record_in: RecordCreate) -> WorkoutRec
     #    db_record オブジェクトに反映されます。
     await db.refresh(db_record)
 
+    logger.info('Workout record created with ID: %s for user_id: %s', db_record.id, user_id)
     # 5. 作成され、IDが採番されたレコードオブジェクトを返します。
     return db_record
 
@@ -46,9 +54,7 @@ async def get_record(db: AsyncSession, record_id: int) -> Optional[WorkoutRecord
     return record
 
 
-async def get_records(
-    db: AsyncSession, skip: int = 0, limit: int = 100
-) -> list[WorkoutRecord]:
+async def get_records(db: AsyncSession, skip: int = 0, limit: int = 100) -> list[WorkoutRecord]:
     """
     トレーニング記録の一覧をデータベースから取得する。
     skip と limit を使ってページネーションをサポートする。
@@ -59,9 +65,7 @@ async def get_records(
     return list(records)
 
 
-async def update_record(
-    db: AsyncSession, record_id: int, record_update: RecordUpdate
-) -> Optional[WorkoutRecord]:
+async def update_record(db: AsyncSession, record_id: int, record_update: RecordUpdate) -> Optional[WorkoutRecord]:
     """
     指定されたIDのトレーニング記録を更新する。
     記録が存在しない場合は None を返す。

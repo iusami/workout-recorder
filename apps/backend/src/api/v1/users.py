@@ -39,9 +39,7 @@ async def create_new_user_endpoint(  # 関数名を register_user_endpoint か�
             detail='Email or Username already registered',
         )
 
-    logger.info(
-        'User created successfully: %s, ID: %s', created_user.email, created_user.id
-    )
+    logger.info('User created successfully: %s, ID: %s', created_user.email, created_user.id)
     return created_user
 
 

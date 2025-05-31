@@ -20,11 +20,9 @@ class User(SQLModel, table=True):
         is_superuser (bool): ユーザーが管理者権限を持っているかどうかを示すフラグ
     """
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True, description="User's email address")
-    username: Optional[str] = Field(
-        default=None, unique=True, index=True, description='Username'
-    )
+    username: Optional[str] = Field(default=None, unique=True, index=True, description='Username')
     hashed_password: str = Field(description='Hashed password')
     is_active: bool = Field(default=True, description='Is the user account active?')
     is_superuser: bool = Field(default=False, description='Is the user a superuser?')
