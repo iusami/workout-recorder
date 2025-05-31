@@ -26,9 +26,7 @@ if settings.ASYNC_TEST_DATABASE_URL:
 
 # 使用するエンジンとセッションを決定
 engine = test_engine if test_engine else production_engine
-async_session_local = (
-    test_session_local if test_session_local else production_session_local
-)
+async_session_local = test_session_local if test_session_local else production_session_local
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

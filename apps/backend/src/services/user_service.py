@@ -61,15 +61,11 @@ async def create_user(db: AsyncSession, user_in: UserCreate) -> Optional[User]:
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
-    logger.info(
-        'User created successfully with email: %s, ID: %s', user_in.email, db_user.id
-    )
+    logger.info('User created successfully with email: %s, ID: %s', user_in.email, db_user.id)
     return db_user
 
 
-async def authenticate_user(
-    db: AsyncSession, email: str, password: str
-) -> Optional[User]:
+async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[User]:
     """
     メールアドレスとパスワードでユーザーを認証する。
     認証に成功すれば User オブジェクトを、失敗すれば None を返す。

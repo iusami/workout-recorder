@@ -21,15 +21,11 @@ class Settings(BaseSettings):
 
     # データベースURL (PostgreSQL または SQLite)
     # CI環境ではSQLiteを使用
-    DATABASE_URL: str = (
-        'sqlite+aiosqlite:///./test.db' if os.environ.get('CI') else Field(...)
-    )
+    DATABASE_URL: str = 'sqlite+aiosqlite:///./test.db' if os.environ.get('CI') else Field(...)
 
     # テスト用データベースURL (環境変数 TEST_DATABASE_URL がなければ None)
     # CI環境ではSQLiteを使用
-    TEST_DATABASE_URL: Optional[str] = Field(
-        default='sqlite+aiosqlite:///./test.db' if os.environ.get('CI') else None
-    )
+    TEST_DATABASE_URL: Optional[str] = Field(default='sqlite+aiosqlite:///./test.db' if os.environ.get('CI') else None)
 
     LOG_LEVEL: str = Field(default='INFO')
 

@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 # WorkoutRecord の Config を除いた基本部分を継承
 class RecordBase(BaseModel):
-    user_id: int
     exercise_date: datetime.date
     exercise: str
     weight: float
@@ -23,6 +22,7 @@ class RecordRead(RecordBase):
     """記録読み取り時の出力スキーマ (IDを含む)"""
 
     id: int
+    user_id: int
 
     class Config:
         from_attributes = True  # DBモデルから変換できるようにする
@@ -31,8 +31,6 @@ class RecordRead(RecordBase):
 class RecordUpdate(BaseModel):
     """記録更新時の入力スキーマ (全てのフィールドがオプショナル)"""
 
-    # user_id は通常更新させないことが多いですが、要件によります。
-    # ここでは一旦更新可能としておきます。
     user_id: Optional[int] = None
     exercise_date: Optional[datetime.date] = None
     exercise: Optional[str] = None

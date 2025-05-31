@@ -47,17 +47,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         # 指定されていなければ、設定ファイルからデフォルトの有効期限（分）を取得
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({'exp': expire})  # 有効期限 (exp) クレームを追加
 
     # JWTをエンコード
     # settings から SECRET_KEY と ALGORITHM を使用
-    encoded_jwt = jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-    )
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 
@@ -67,9 +63,7 @@ def decode_access_token(token: str) -> str:
     検証に失敗した場合は HTTPException を発生させる。
     """
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         # "sub" (subject) クレームを取得
         subject: Optional[str] = payload.get('sub')
         if subject is None:

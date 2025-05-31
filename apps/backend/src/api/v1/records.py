@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.api.v1.auth import get_current_active_user
 from src.core.database import get_session
+from src.models.user import User
 
 # 必要なモジュールをインポート
 from src.schemas.record import RecordCreate, RecordRead, RecordUpdate
@@ -17,13 +19,14 @@ router = APIRouter(
 @router.post('/', response_model=RecordRead, status_code=status.HTTP_201_CREATED)
 async def create_record_endpoint(
     record_in: RecordCreate,  # リクエストボディ
-    db: AsyncSession = Depends(get_session),  # DBセッションをDIで取得
+    db: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     新しいトレーニング記録を作成するエンドポイント。
     """
     # サービス層を呼び出して記録を作成
-    created_record = await record_service.create_record(db=db, record_in=record_in)
+    created_record = await record_service.create_record(db=db, record_in=record_in, user_id=current_user.id)
 
     # 作成された記録を返す
     return created_record
@@ -65,19 +68,13 @@ async def update_record_endpoint(
     """
     指定されたIDのトレーニング記録を更新する。
     """
-    updated_record = await record_service.update_record(
-        db=db, record_id=record_id, record_update=record_in
-    )
+    updated_record = await record_service.update_record(db=db, record_id=record_id, record_update=record_in)
     if updated_record is None:
-        raise HTTPException(
-            status_code=404, detail='Workout record not found to update'
-        )
+        raise HTTPException(status_code=404, detail='Workout record not found to update')
     return updated_record
 
 
-@router.delete(
-    '/{record_id}', response_model=RecordRead, status_code=status.HTTP_200_OK
-)
+@router.delete('/{record_id}', response_model=RecordRead, status_code=status.HTTP_200_OK)
 async def delete_record_endpoint(
     record_id: int,
     db: AsyncSession = Depends(get_session),

@@ -35,15 +35,12 @@ async def login_for_access_token(
     logger.info('Login attempt for username (email): %s', form_data.username)
 
     # 1. ユーザー認証サービスを呼び出す
-    user = await user_service.authenticate_user(
-        db=db, email=form_data.username, password=form_data.password
-    )
+    user = await user_service.authenticate_user(db=db, email=form_data.username, password=form_data.password)
 
     # 2. 認証失敗時のエラーハンドリング
     if not user:
         logger.warning(
-            'Login failed for username (email): %s.'
-            'Invalid credentials or inactive user.',
+            'Login failed for username (email): %s.Invalid credentials or inactive user.',
             form_data.username,
         )
         raise HTTPException(
@@ -58,9 +55,7 @@ async def login_for_access_token(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token_data = {'sub': user.email}
 
-    access_token = create_access_token(
-        data=access_token_data, expires_delta=access_token_expires
-    )
+    access_token = create_access_token(data=access_token_data, expires_delta=access_token_expires)
 
     logger.info('Token generated successfully for user: %s', user.email)
 
@@ -94,9 +89,7 @@ async def get_current_active_user(
         )
     if not user.is_active:
         logger.warning('Authentication attempt for inactive user: %s', user.email)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail='Inactive user'
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Inactive user')
 
     logger.debug('Current active user identified: %s', user.email)
     return user

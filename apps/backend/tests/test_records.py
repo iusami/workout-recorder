@@ -1,41 +1,15 @@
 import datetime
+from typing import Optional
 
 import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.schemas.user import UserCreate
 from src.schemas.record import RecordCreate, RecordUpdate
-from src.services import record_service
+from src.services import record_service, user_service
 
 pytestmark = pytest.mark.asyncio
-
-async def test_create_record_api(test_client: AsyncClient):
-    """
-    POST /api/v1/records/ が成功し、201と記録データを返すことをテストする。
-    """
-    # 1. テストデータを作成
-    record_data = {
-        "user_id": 1,
-        "exercise_date": "2025-05-29", # APIには YYYY-MM-DD 形式の文字列で送信
-        "exercise": "Deadlift",
-        "weight": 120.0,
-        "reps": 3,
-        "set_reps": 1,
-        "notes": "API Test",
-    }
-
-    # 2. APIエンドポイントを呼び出す
-    response = await test_client.post("/api/v1/records/", json=record_data)
-
-    # 3. アサーション
-    assert response.status_code == 201 # ステータスコードが 201 か
-
-    response_data = response.json()
-    assert response_data["user_id"] == record_data["user_id"]
-    assert response_data["exercise"] == record_data["exercise"]
-    assert response_data["weight"] == record_data["weight"]
-    assert "id" in response_data # IDが返されているか
-    assert response_data["exercise_date"] == record_data["exercise_date"]
 
 async def test_read_record_api_success(test_client: AsyncClient,
                                        db_session: AsyncSession):
@@ -44,8 +18,8 @@ async def test_read_record_api_success(test_client: AsyncClient,
     指定されたIDの記録データを返すことをテストする。
     """
     # 1. 事前にテストデータをDBに作成 (サービス層を直接利用)
+    test_user_id = 1
     record_to_create = RecordCreate(
-        user_id=1,
         exercise_date=datetime.date(2025, 5, 30),
         exercise="Bench Press",
         weight=80.0,
@@ -55,7 +29,8 @@ async def test_read_record_api_success(test_client: AsyncClient,
     )
     # サービスを使って直接DBに保存
     created_record_model = await record_service.create_record(db=db_session,
-                                                              record_in=record_to_create)
+                                                              record_in=record_to_create,
+                                                              user_id=test_user_id)
     assert created_record_model.id is not None # IDが採番されていることを確認
 
     # 2. APIエンドポイントを呼び出す
@@ -85,8 +60,8 @@ async def test_get_record_by_id_service_success(db_session: AsyncSession):
     record_service.get_record が指定されたIDの記録を正しく取得できることをテストする。
     """
     # 1. テストデータを作成
+    test_user_id = 1
     record_to_create = RecordCreate(
-        user_id=2,
         exercise_date=datetime.date(2025, 5, 31),
         exercise="Overhead Press",
         weight=40.0,
@@ -94,7 +69,8 @@ async def test_get_record_by_id_service_success(db_session: AsyncSession):
         set_reps=4
     )
     created_record = await record_service.create_record(db=db_session,
-                                                        record_in=record_to_create)
+                                                        record_in=record_to_create,
+                                                        user_id=test_user_id)
     assert created_record.id is not None
 
     # 2. サービス関数を呼び出す
@@ -122,8 +98,8 @@ async def test_read_records_api_success(test_client: AsyncClient,
     GET /api/v1/records/ が成功し、記録のリストを返すことをテストする。
     """
     # 1. 事前に複数のテストデータをDBに作成
+    test_user_id = 1
     record1_data = RecordCreate(
-        user_id=1,
         exercise_date=datetime.date(2025, 6, 1),
         exercise="Push Up",
         weight=0,
@@ -132,7 +108,6 @@ async def test_read_records_api_success(test_client: AsyncClient,
         notes="Record 1"
     )
     record2_data = RecordCreate(
-        user_id=1,
         exercise_date=datetime.date(2025, 6, 2),
         exercise="Pull Up",
         weight=0,
@@ -140,8 +115,12 @@ async def test_read_records_api_success(test_client: AsyncClient,
         set_reps=3,
         notes="Record 2"
     )
-    await record_service.create_record(db=db_session, record_in=record1_data)
-    await record_service.create_record(db=db_session, record_in=record2_data)
+    await record_service.create_record(db=db_session,
+                                       record_in=record1_data,
+                                       user_id=test_user_id)
+    await record_service.create_record(db=db_session,
+                                       record_in=record2_data,
+                                       user_id=test_user_id)
 
     # 2. APIエンドポイントを呼び出す
     response = await test_client.get("/api/v1/records/")
@@ -163,19 +142,24 @@ async def test_get_records_service(db_session: AsyncSession):
     record_service.get_records が記録のリストを正しく取得できることをテストする。
     """
     # 1. 複数のテストデータを作成
-    record1_data = RecordCreate(user_id=1, 
-                                exercise_date=datetime.date(2025, 6, 3), exercise="Dip",
-                                weight=10,
-                                reps=15,
-                                set_reps=3)
-    record2_data = RecordCreate(user_id=1,
-                                exercise_date=datetime.date(2025, 6, 4),
-                                exercise="Leg Press",
-                                weight=150,
-                                reps=12,
-                                set_reps=3)
-    await record_service.create_record(db=db_session, record_in=record1_data)
-    await record_service.create_record(db=db_session, record_in=record2_data)
+    test_user_id = 1
+    record1_data = RecordCreate(
+        exercise_date=datetime.date(2025, 6, 3), exercise="Dip",
+        weight=10,
+        reps=15,
+        set_reps=3)
+    record2_data = RecordCreate(
+        exercise_date=datetime.date(2025, 6, 4),
+        exercise="Leg Press",
+        weight=150,
+        reps=12,
+        set_reps=3)
+    await record_service.create_record(db=db_session,
+                                       record_in=record1_data,
+                                       user_id=test_user_id)
+    await record_service.create_record(db=db_session,
+                                       record_in=record2_data,
+                                       user_id=test_user_id)
 
     # 2. サービス関数を呼び出す
     retrieved_records = await record_service.get_records(db=db_session,
@@ -207,12 +191,18 @@ async def test_update_record_api_success(test_client: AsyncClient,
     更新された記録データを返すことをテストする。
     """
     # 1. 事前にテストデータをDBに作成
+    test_user_id = 1
     initial_data = RecordCreate(
-        user_id=1, exercise_date=datetime.date(2025, 7, 1), exercise="Squat",
-        weight=100.0, reps=5, set_reps=3, notes="Initial Notes"
+        exercise_date=datetime.date(2025, 7, 1),
+        exercise="Squat",
+        weight=100.0,
+        reps=5,
+        set_reps=3,
+        notes="Initial Notes"
     )
     created_record = await record_service.create_record(db=db_session,
-                                                        record_in=initial_data)
+                                                        record_in=initial_data,
+                                                        user_id=test_user_id)
     assert created_record.id is not None
 
     # 2. 更新用データを作成 (例: notes と weight を変更)
@@ -251,8 +241,8 @@ async def test_update_record_service_success(db_session: AsyncSession):
     正しく更新できることをテストする。
     """
     # 1. 初期データを作成・保存
+    test_user_id = 1
     initial_record_data = RecordCreate(
-        user_id=3,
         exercise_date=datetime.date(2025, 7, 2),
         exercise="Bench Press",
         weight=90.0,
@@ -261,7 +251,8 @@ async def test_update_record_service_success(db_session: AsyncSession):
         notes="Initial state"
     )
     initial_record = await record_service.create_record(db=db_session,
-                                                        record_in=initial_record_data)
+                                                        record_in=initial_record_data,
+                                                        user_id=test_user_id)
     assert initial_record.id is not None
 
     # 2. 更新用データを作成 (一部のフィールドのみ)
@@ -299,8 +290,8 @@ async def test_delete_record_service_success(db_session: AsyncSession):
     その後、get_record で取得できないことも確認する。
     """
     # 1. テストデータを作成・保存
+    test_user_id = 1
     record_to_create = RecordCreate(
-        user_id=1,
         exercise_date=datetime.date(2025, 1, 1),
         exercise="Test Exercise for Deletion",
         weight=50.0,
@@ -308,7 +299,8 @@ async def test_delete_record_service_success(db_session: AsyncSession):
         set_reps=3
     )
     created_record = await record_service.create_record(db=db_session,
-                                                        record_in=record_to_create)
+                                                        record_in=record_to_create,
+                                                        user_id=test_user_id)
     assert created_record.id is not None
     created_record_id = created_record.id # IDを保存しておく
 
@@ -346,8 +338,8 @@ async def test_delete_record_api_success(test_client: AsyncClient,
     削除された記録データを返し、実際にDBから削除されることをテストする。
     """
     # 1. 事前にテストデータをDBに作成 (サービス層を直接利用)
+    test_user_id = 10
     record_to_create = RecordCreate(
-        user_id=10, # APIテスト用に別のユーザーIDなどを使うと区別しやすい
         exercise_date=datetime.date(2025, 12, 25),
         exercise="API Delete Test Exercise",
         weight=77.7,
@@ -356,7 +348,8 @@ async def test_delete_record_api_success(test_client: AsyncClient,
         notes="To be deleted via API",
     )
     created_record = await record_service.create_record(db=db_session,
-                                                        record_in=record_to_create)
+                                                        record_in=record_to_create,
+                                                        user_id=test_user_id)
     assert created_record.id is not None
     created_record_id = created_record.id
 
@@ -386,6 +379,70 @@ async def test_delete_record_api_not_found(test_client: AsyncClient):
     response = await test_client.delete(f"/api/v1/records/{non_existent_id}")
 
     assert response.status_code == 404 # FastAPIのstatus.HTTP_404_NOT_FOUND
-    # Optional: detailメッセージの確認も可能
-    # response_data = response.json()
-    # assert response_data["detail"] == "Workout record not found to delete"
+
+async def get_auth_headers(test_client: AsyncClient,
+                           db_session: AsyncSession,
+                           email: str,
+                           password: str,
+                           username: Optional[str] = None) -> dict:
+    """ヘルパー関数: テストユーザーを作成・ログインし、認証ヘッダーを返す"""
+    if username is None:
+        username = email.split('@')[0] + "_header_user" # 適当なユーザー名
+
+    # ユーザーが存在しない場合のみ作成
+    user_check = await user_service.get_user_by_email(db=db_session, email=email)
+    if not user_check:
+        user_create_data = UserCreate(email=email, username=username, password=password)
+        await user_service.create_user(db=db_session, user_in=user_create_data)
+
+    login_payload = {"username": email, "password": password}
+    login_response = await test_client.post("/api/v1/auth/token", data=login_payload)
+    assert login_response.status_code == 200, f"Failed to login for token: {login_response.text}"
+    token = login_response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+async def test_create_record_api_no_token(test_client: AsyncClient):
+    """
+    POST /api/v1/records/ にトークンなしでアクセスすると 401 Unauthorized が返る。
+    """
+    record_payload = {
+        "date": "2025-07-03",
+        "exercise": "Overhead Press",
+        "weight": 50.0,
+        "reps": 5,
+        "set_reps": 5,
+    }
+    response = await test_client.post("/api/v1/records/", json=record_payload)
+    assert response.status_code == 401
+
+async def test_create_record_api_with_token_success(test_client: AsyncClient, db_session: AsyncSession):
+    """
+    POST /api/v1/records/ に有効なトークンでアクセスすると記録が作成され、
+    作成された記録の user_id がトークンのユーザーのIDと一致する。
+    """
+    user_email = "record_creator@example.com"
+    user_password = "password123"
+    auth_headers = await get_auth_headers(test_client, db_session, user_email, user_password)
+
+    # ログインユーザーの情報を取得して user_id を確認 (テストの正確性のため)
+    me_response = await test_client.get("/api/v1/users/me", headers=auth_headers)
+    assert me_response.status_code == 200
+    current_user_id = me_response.json()["id"]
+
+    record_payload = {
+        "exercise_date": "2025-07-04",
+        "exercise": "Barbell Row",
+        "weight": 60.0,
+        "reps": 8,
+        "set_reps": 3,
+        "notes": "Good form"
+    }
+
+    response = await test_client.post("/api/v1/records/", json=record_payload, headers=auth_headers)
+
+    # アサーション
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["exercise"] == record_payload["exercise"]
+    assert "id" in response_data
+    assert response_data["user_id"] == current_user_id
