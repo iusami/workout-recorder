@@ -7,7 +7,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.core.logger import APP_LOGGER_NAME
-from src.core.security import hash_password
+from src.core.security import hash_password, verify_password
 from src.models.user import User
 from src.schemas.user import UserCreate
 
@@ -65,3 +65,33 @@ async def create_user(db: AsyncSession, user_in: UserCreate) -> Optional[User]:
         'User created successfully with email: %s, ID: %s', user_in.email, db_user.id
     )
     return db_user
+
+
+async def authenticate_user(
+    db: AsyncSession, email: str, password: str
+) -> Optional[User]:
+    """
+    メールアドレスとパスワードでユーザーを認証する。
+    認証に成功すれば User オブジェクトを、失敗すれば None を返す。
+    """
+    logger.debug('Attempting to authenticate user with email: %s', email)
+
+    # 1. メールアドレスでユーザーを取得 (既存の関数を再利用)
+    user = await get_user_by_email(db=db, email=email)
+
+    # 2. ユーザーが存在しないか、アクティブでないかを確認
+    if not user:
+        logger.info('Authentication failed: User not found for email %s', email)
+        return None
+    if not user.is_active:
+        logger.info('Authentication failed: User %s is inactive.', email)
+        return None  # 非アクティブなユーザーは認証失敗
+
+    # 3. パスワードを検証 (core.security の verify_password を使用)
+    if not verify_password(password, user.hashed_password):
+        logger.info('Authentication failed: Invalid password for user %s', email)
+        return None
+
+    # 4. すべてのチェックをパスしたら、ユーザーオブジェクトを返す (認証成功)
+    logger.info('User %s authenticated successfully.', email)
+    return user
