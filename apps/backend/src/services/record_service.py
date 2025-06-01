@@ -91,8 +91,24 @@ async def update_record(db: AsyncSession, record_id: int, record_update: RecordU
 
 async def delete_record(db: AsyncSession, record_id: int, user_id: int) -> Optional[WorkoutRecord]:
     """
-    指定されたIDのトレーニング記録をデータベースから削除する。
-    成功した場合は削除されたレコードオブジェクトを、見つからない場合はNoneを返す。
+    Deletes a workout record if it exists and belongs to the specified user.
+
+    This function attempts to delete a workout record by its ID, but only if the
+    record belongs to the user making the request. This ensures users can only
+    delete their own records.
+
+    Args:
+        db (AsyncSession): The database session.
+        record_id (int): The ID of the record to delete.
+        user_id (int): The ID of the user attempting to delete the record.
+
+    Returns:
+        Optional[WorkoutRecord]:
+            - The deleted WorkoutRecord object if successful (for serialization).
+            - None if the record doesn't exist or doesn't belong to the user.
+
+    Raises:
+        SQLAlchemyError: If there's an issue with the database operation.
     """
 
     logger.info('User %s attempting to delete record_id: %s', user_id, record_id)
