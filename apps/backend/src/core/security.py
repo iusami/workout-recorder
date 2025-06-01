@@ -66,7 +66,6 @@ def decode_access_token(token: str) -> str:
     アクセストークンをデコードし、ペイロードから subject (ユーザー識別子) を抽出する。
     検証に失敗した場合は HTTPException を発生させる。
     """
-    logger.debug('Attempting to decode token: %s...', token[:30])
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         # "sub" (subject) クレームを取得
@@ -78,10 +77,10 @@ def decode_access_token(token: str) -> str:
         logger.debug('Token decoded successfully. Subject (sub): %s', subject)
         return subject
     except ExpiredSignatureError as exc:
-        logger.warning('Token decoding failed: Token has expired. Token: %s...', token[:30])
+        logger.warning('Token decoding failed: Token has expired.')
         # トークンの有効期限切れ
         raise EXPIRED_TOKEN_EXCEPTION from exc
     except JWTError as exc:
-        logger.warning('Token decoding failed: JWTError: %s. Token: %s...', str(exc), token[:30])
+        logger.warning('Token decoding failed: JWTError: %s.', str(exc))
         # その他のJWT関連エラー (署名不正など)
         raise CREDENTIALS_EXCEPTION from exc

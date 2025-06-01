@@ -72,7 +72,6 @@ async def get_current_active_user(
     アクティブなユーザーオブジェクトを返す依存関係関数。
     トークンが無効、ユーザーが存在しない、または非アクティブな場合は HTTPException
     """
-    logger.debug('get_current_active_user: Received token: %s...', token[:30] if token else 'No token')
 
     # decode_access_token はトークンが無効/期限切れの場合に HTTPException を発生させる
     email_from_token = decode_access_token(token)

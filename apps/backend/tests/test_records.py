@@ -301,7 +301,7 @@ async def get_auth_headers(
     login_response = await test_client.post('/api/v1/auth/token', data=login_payload)
     assert login_response.status_code == 200, f'Failed to login for token: {login_response.text}'
     token = login_response.json()['access_token']
-    logger.debug('get_auth_headers: Token obtained for user %s: %s...', email, token[:30])
+    logger.debug('get_auth_headers: Token obtained for user %s', email)
     return {'Authorization': f'Bearer {token}'}
 
 
