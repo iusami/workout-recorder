@@ -13,10 +13,10 @@ from src.core.database import get_session
 from src.main import create_app
 
 # テスト用DB URLを確定 (SQLiteを強制使用)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+TEST_DATABASE_URL = 'sqlite+aiosqlite:///./test.db'
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope='session')
 def event_loop():
     """
     テストセッション全体で単一のイベントループを作成して使用する。
@@ -26,7 +26,7 @@ def event_loop():
     loop.close()
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope='session')
 async def test_engine(event_loop) -> AsyncGenerator[AsyncEngine, None]:
     """
     セッションスコープで非同期テストエンジンを作成するフィクスチャ。
@@ -40,7 +40,7 @@ async def test_engine(event_loop) -> AsyncGenerator[AsyncEngine, None]:
     await engine.dispose()
 
 
-@pytest_asyncio.fixture(scope="function", autouse=True)
+@pytest_asyncio.fixture(scope='function', autouse=True)
 async def setup_tables(test_engine: AsyncEngine):
     """
     各テストの前にテーブルを再作成するフィクスチャ。
@@ -52,7 +52,7 @@ async def setup_tables(test_engine: AsyncEngine):
     except (ProgrammingError, OperationalError) as e:
         # テーブルが存在しない場合の特定のエラーのみ無視
         # エラーの内容をログに出力することも検討
-        print(f"テーブル削除中のエラーを無視します: {e}")
+        print(f'テーブル削除中のエラーを無視します: {e}')
 
     # 新しいトランザクションでテーブルを作成
     async with test_engine.begin() as conn:
@@ -61,19 +61,17 @@ async def setup_tables(test_engine: AsyncEngine):
     yield
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture(scope='function')
 async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     """
     各テスト用の非同期DBセッションを提供するフィクスチャ。
     """
-    session_maker = async_sessionmaker(
-        bind=test_engine, class_=AsyncSession, expire_on_commit=False
-    )
+    session_maker = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
     async with session_maker() as session:
         yield session
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture(scope='function')
 async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
     FastAPIのTestClientを提供するフィクスチャ。
@@ -85,8 +83,7 @@ async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
 
     app.dependency_overrides[get_session] = _override_get_session
 
-    async with AsyncClient(transport=ASGITransport(app=app),
-                           base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
         yield client
 
     app.dependency_overrides.clear()
