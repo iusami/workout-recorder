@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -7,6 +8,9 @@ from jose.exceptions import ExpiredSignatureError, JWTError
 from passlib.context import CryptContext
 
 from src.core.config import settings
+from src.core.logger import APP_LOGGER_NAME
+
+logger = logging.getLogger(APP_LOGGER_NAME)
 
 # トークン検証失敗時のための共通例外
 CREDENTIALS_EXCEPTION = HTTPException(
@@ -62,18 +66,22 @@ def decode_access_token(token: str) -> str:
     アクセストークンをデコードし、ペイロードから subject (ユーザー識別子) を抽出する。
     検証に失敗した場合は HTTPException を発生させる。
     """
+    logger.debug('Attempting to decode token: %s...', token[:30])
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         # "sub" (subject) クレームを取得
         subject: Optional[str] = payload.get('sub')
         if subject is None:
+            logger.warning("Token decoding failed: 'sub' claim missing in payload: %s", payload)
             # subject がペイロードに含まれない、または None の場合は不正なトークン
             raise CREDENTIALS_EXCEPTION
-
+        logger.debug('Token decoded successfully. Subject (sub): %s', subject)
         return subject
     except ExpiredSignatureError as exc:
+        logger.warning('Token decoding failed: Token has expired. Token: %s...', token[:30])
         # トークンの有効期限切れ
         raise EXPIRED_TOKEN_EXCEPTION from exc
     except JWTError as exc:
+        logger.warning('Token decoding failed: JWTError: %s. Token: %s...', str(exc), token[:30])
         # その他のJWT関連エラー (署名不正など)
         raise CREDENTIALS_EXCEPTION from exc

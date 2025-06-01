@@ -89,14 +89,30 @@ async def update_record(db: AsyncSession, record_id: int, record_update: RecordU
     return db_record
 
 
-async def delete_record(db: AsyncSession, record_id: int) -> Optional[WorkoutRecord]:
+async def delete_record(db: AsyncSession, record_id: int, user_id: int) -> Optional[WorkoutRecord]:
     """
     指定されたIDのトレーニング記録をデータベースから削除する。
     成功した場合は削除されたレコードオブジェクトを、見つからない場合はNoneを返す。
     """
+
+    logger.info('User %s attempting to delete record_id: %s', user_id, record_id)
     record_object = await get_record(db=db, record_id=record_id)
     if record_object:
+        # 所有者であるかを確認
+        if record_object.user_id != user_id:
+            logger.warning(
+                'User %s attempted to delete record_id: %s owned by user %s. Forbidden.',
+                user_id,
+                record_id,
+                record_object.user_id,
+            )
+            return None  # 他人の記録なので削除しない (Noneを返す)
+
+        # 所有者なので削除
         await db.delete(record_object)
         await db.commit()
-        return record_object
-    return None
+        logger.info('Record record_id: %s deleted successfully by user %s.', record_id, user_id)
+        return record_object  # 削除されたオブジェクトを返す (API層でシリアライズ用)
+
+    logger.warning('Record record_id: %s not found for deletion by user %s.', record_id, user_id)
+    return None  # 記録が見つからない

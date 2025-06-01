@@ -72,10 +72,11 @@ async def get_current_active_user(
     アクティブなユーザーオブジェクトを返す依存関係関数。
     トークンが無効、ユーザーが存在しない、または非アクティブな場合は HTTPException
     """
-    logger.debug('Attempting to get current active user from token.')
+    logger.debug('get_current_active_user: Received token: %s...', token[:30] if token else 'No token')
 
     # decode_access_token はトークンが無効/期限切れの場合に HTTPException を発生させる
     email_from_token = decode_access_token(token)
+    logger.debug('get_current_active_user: Email from token: %s', email_from_token)
 
     user = await user_service.get_user_by_email(db, email=email_from_token)
 
@@ -87,6 +88,7 @@ async def get_current_active_user(
             detail='Could not validate credentials - user not found',
             headers={'WWW-Authenticate': 'Bearer'},
         )
+    logger.debug('get_current_active_user: User found in DB: %s, is_active: %s', user.email, user.is_active)
     if not user.is_active:
         logger.warning('Authentication attempt for inactive user: %s', user.email)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Inactive user')

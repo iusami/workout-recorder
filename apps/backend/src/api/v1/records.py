@@ -1,13 +1,19 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.api.v1.auth import get_current_active_user
 from src.core.database import get_session
+from src.core.logger import APP_LOGGER_NAME
 from src.models.user import User
 
 # 必要なモジュールをインポート
 from src.schemas.record import RecordCreate, RecordRead, RecordUpdate
 from src.services import record_service
+
+# ロガーの設定
+logger = logging.getLogger(APP_LOGGER_NAME)
 
 # ルーターの設定を /records に合わせる
 router = APIRouter(
@@ -76,18 +82,23 @@ async def update_record_endpoint(
 
 @router.delete('/{record_id}', response_model=RecordRead, status_code=status.HTTP_200_OK)
 async def delete_record_endpoint(
-    record_id: int,
-    db: AsyncSession = Depends(get_session),
+    record_id: int, db: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_active_user)
 ):
     """
     指定されたIDのトレーニング記録を削除する。
     成功した場合は削除された記録オブジェクトを返す。
     記録が見つからない場合は404エラーを返す。
     """
-    deleted_record = await record_service.delete_record(db=db, record_id=record_id)
+    logger.info('User %s (ID: %d) attempting to delete record_id: %d', current_user.email, current_user.id, record_id)
+
+    deleted_record = await record_service.delete_record(db=db, record_id=record_id, user_id=current_user.id)
     if deleted_record is None:
+        logger.warning(
+            'Failed to delete record_id: %d by user %s. Record not found or not owned.', record_id, current_user.email
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail='Workout record not found to delete',
+            detail='Workout record not found or you do not have permission to delete it',
         )
+    logger.info('Record record_id: %d deleted successfully by user %s.', record_id, current_user.email)
     return deleted_record
