@@ -55,11 +55,12 @@ async def read_records_endpoint(
 async def read_record_endpoint(
     record_id: int,
     db: AsyncSession = Depends(get_session),  # DBセッションを有効化
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     指定されたIDのトレーニング記録を読み取る。
     """
-    db_record = await record_service.get_record(db=db, record_id=record_id)
+    db_record = await record_service.get_record(db=db, record_id=record_id, user_id=current_user.id)
     if db_record is None:
         raise HTTPException(status_code=404, detail='Workout record not found')
     return db_record
@@ -70,11 +71,14 @@ async def update_record_endpoint(
     record_id: int,
     record_in: RecordUpdate,
     db: AsyncSession = Depends(get_session),  # DBセッションを有効化
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     指定されたIDのトレーニング記録を更新する。
     """
-    updated_record = await record_service.update_record(db=db, record_id=record_id, record_update=record_in)
+    updated_record = await record_service.update_record(
+        db=db, record_id=record_id, record_update=record_in, user_id=current_user.id
+    )
     if updated_record is None:
         raise HTTPException(status_code=404, detail='Workout record not found to update')
     return updated_record

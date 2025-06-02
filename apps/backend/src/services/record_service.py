@@ -43,14 +43,30 @@ async def create_record(db: AsyncSession, record_in: RecordCreate, user_id: int)
     return db_record
 
 
-async def get_record(db: AsyncSession, record_id: int) -> Optional[WorkoutRecord]:
+async def get_record(db: AsyncSession, record_id: int, user_id: int) -> Optional[WorkoutRecord]:
     """
     指定されたIDのトレーニング記録をデータベースから取得する。
     存在しない場合は None を返す。
     """
-    statement = select(WorkoutRecord).where(WorkoutRecord.id == record_id)
+    logger.debug('Fetching workout record with record_id: %s for user_id: %s', record_id, user_id)
+
+    statement = select(WorkoutRecord).where(
+        WorkoutRecord.id == record_id,
+        WorkoutRecord.user_id == user_id,  # ユーザーIDの条件を追加
+    )
+
     result = await db.exec(statement)
-    record = result.one_or_none()  # 1件取得、なければNone
+    record = result.one_or_none()
+
+    if record:
+        logger.debug(
+            'Found record via get_record: ID=%s, UserID=%s, Exercise=%s',
+            record.id,
+            record.user_id,
+            getattr(record, 'exercise', 'N/A'),  # exercise_dateをexerciseに変更
+        )
+    else:
+        logger.warning('Record not found via get_record for record_id: %s and user_id: %s', record_id, user_id)
     return record
 
 
@@ -65,12 +81,14 @@ async def get_records(db: AsyncSession, skip: int = 0, limit: int = 100) -> list
     return list(records)
 
 
-async def update_record(db: AsyncSession, record_id: int, record_update: RecordUpdate) -> Optional[WorkoutRecord]:
+async def update_record(
+    db: AsyncSession, record_id: int, record_update: RecordUpdate, user_id: int
+) -> Optional[WorkoutRecord]:
     """
     指定されたIDのトレーニング記録を更新する。
     記録が存在しない場合は None を返す。
     """
-    db_record = await get_record(db=db, record_id=record_id)
+    db_record = await get_record(db=db, record_id=record_id, user_id=user_id)
     if not db_record:
         return None
 
@@ -112,7 +130,7 @@ async def delete_record(db: AsyncSession, record_id: int, user_id: int) -> Optio
     """
 
     logger.info('User %s attempting to delete record_id: %s', user_id, record_id)
-    record_object = await get_record(db=db, record_id=record_id)
+    record_object = await get_record(db=db, record_id=record_id, user_id=user_id)
     if record_object:
         # 所有者であるかを確認
         if record_object.user_id != user_id:
