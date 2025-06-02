@@ -16,51 +16,6 @@ logger = logging.getLogger(APP_LOGGER_NAME)
 pytestmark = pytest.mark.asyncio
 
 
-async def test_read_record_api_success(test_client: AsyncClient, db_session: AsyncSession):
-    """
-    GET /api/v1/records/{record_id} が成功し、
-    指定されたIDの記録データを返すことをテストする。
-    """
-    # 1. 事前にテストデータをDBに作成 (サービス層を直接利用)
-    test_user_id = 1
-    record_to_create = RecordCreate(
-        exercise_date=datetime.date(2025, 5, 30),
-        exercise='Bench Press',
-        weight=80.0,
-        reps=8,
-        set_reps=3,
-        notes='Test record for reading',
-    )
-    # サービスを使って直接DBに保存
-    created_record_model = await record_service.create_record(
-        db=db_session, record_in=record_to_create, user_id=test_user_id
-    )
-    assert created_record_model.id is not None  # IDが採番されていることを確認
-
-    # 2. APIエンドポイントを呼び出す
-    response = await test_client.get(f'/api/v1/records/{created_record_model.id}')
-
-    # 3. アサーション
-    assert response.status_code == 200  # 成功時は200 OK
-
-    # 4. レスポンスボディのチェック
-    response_data = response.json()
-    assert response_data['id'] == created_record_model.id
-    assert response_data['exercise'] == created_record_model.exercise
-    assert response_data['user_id'] == created_record_model.user_id
-    # 必要に応じて他のフィールドもチェック
-
-
-async def test_read_record_api_not_found(test_client: AsyncClient):
-    """
-    存在しないIDの記録を読み込もうとした場合、404 Not Foundが返ることをテストする。
-    """
-    non_existent_id = 99999
-    response = await test_client.get(f'/api/v1/records/{non_existent_id}')
-
-    assert response.status_code == 404
-
-
 async def test_get_record_by_id_service_success(db_session: AsyncSession):
     """
     record_service.get_record が指定されたIDの記録を正しく取得できることをテストする。
@@ -74,7 +29,7 @@ async def test_get_record_by_id_service_success(db_session: AsyncSession):
     assert created_record.id is not None
 
     # 2. サービス関数を呼び出す
-    retrieved_record = await record_service.get_record(db=db_session, record_id=created_record.id)
+    retrieved_record = await record_service.get_record(db=db_session, record_id=created_record.id, user_id=test_user_id)
 
     # 3. アサーション
     assert retrieved_record is not None
@@ -87,7 +42,7 @@ async def test_get_record_by_id_service_not_found(db_session: AsyncSession):
     存在しないIDで record_service.get_record を呼び出すと None が返ることをテストする。
     """
     non_existent_id = 99998
-    retrieved_record = await record_service.get_record(db=db_session, record_id=non_existent_id)
+    retrieved_record = await record_service.get_record(db=db_session, record_id=non_existent_id, user_id=1)
 
     assert retrieved_record is None
 
@@ -154,51 +109,6 @@ async def test_get_records_service(db_session: AsyncSession):
     assert skipped_records[0].exercise == 'Leg Press'  # 2番目の記録のはず
 
 
-async def test_update_record_api_success(test_client: AsyncClient, db_session: AsyncSession):
-    """
-    PUT /api/v1/records/{record_id} が成功し、
-    更新された記録データを返すことをテストする。
-    """
-    # 1. 事前にテストデータをDBに作成
-    test_user_id = 1
-    initial_data = RecordCreate(
-        exercise_date=datetime.date(2025, 7, 1),
-        exercise='Squat',
-        weight=100.0,
-        reps=5,
-        set_reps=3,
-        notes='Initial Notes',
-    )
-    created_record = await record_service.create_record(db=db_session, record_in=initial_data, user_id=test_user_id)
-    assert created_record.id is not None
-
-    # 2. 更新用データを作成 (例: notes と weight を変更)
-    update_payload = {'notes': 'Updated notes after feeling stronger!', 'weight': 102.5}
-
-    # 3. APIエンドポイントを呼び出す
-    response = await test_client.put(f'/api/v1/records/{created_record.id}', json=update_payload)
-
-    # 4. アサーション
-    assert response.status_code == 200  # 成功時は200 OK
-
-    response_data = response.json()
-    assert response_data['id'] == created_record.id
-    assert response_data['notes'] == update_payload['notes']  # 更新されたフィールド
-    assert response_data['weight'] == update_payload['weight']  # 更新されたフィールド
-    assert response_data['exercise'] == initial_data.exercise
-
-
-async def test_update_record_api_not_found(test_client: AsyncClient):
-    """
-    存在しないIDの記録を更新しようとした場合、404 Not Foundが返ることをテストする。
-    """
-    non_existent_id = 99997
-    update_payload = {'notes': 'This should fail'}
-    response = await test_client.put(f'/api/v1/records/{non_existent_id}', json=update_payload)
-
-    assert response.status_code == 404
-
-
 async def test_update_record_service_success(db_session: AsyncSession):
     """
     record_service.update_record が指定されたIDの記録を
@@ -224,7 +134,7 @@ async def test_update_record_service_success(db_session: AsyncSession):
 
     # 3. サービス関数を呼び出す
     updated_record = await record_service.update_record(
-        db=db_session, record_id=initial_record.id, record_update=update_data
+        db=db_session, record_id=initial_record.id, record_update=update_data, user_id=test_user_id
     )
 
     # 4. アサーション
@@ -243,7 +153,7 @@ async def test_update_record_service_not_found(db_session: AsyncSession):
     non_existent_id = 99996
     update_data = RecordUpdate(notes='This should not apply')
     updated_record = await record_service.update_record(
-        db=db_session, record_id=non_existent_id, record_update=update_data
+        db=db_session, record_id=non_existent_id, record_update=update_data, user_id=1
     )
     assert updated_record is None
 
@@ -275,7 +185,9 @@ async def test_delete_record_service_success(db_session: AsyncSession):
     assert deleted_record.user_id == 1
 
     # 4. 削除されたことを確認 (get_record で取得できない)
-    record_after_deletion = await record_service.get_record(db=db_session, record_id=created_record_id)
+    record_after_deletion = await record_service.get_record(
+        db=db_session, record_id=created_record_id, user_id=test_user_id
+    )
     assert record_after_deletion is None
 
 
@@ -397,8 +309,13 @@ async def test_delete_record_api_another_users_record(test_client: AsyncClient, 
     # 404 (見つからない) または 403 (権限なし) を期待。サービスの実装による。
     assert response.status_code == 404
 
+    # idが存在することを確認
+    assert created_record_a.id is not None
+
     # 実際に削除されていないことも確認
-    record_still_exists = await record_service.get_record(db=db_session, record_id=created_record_a.user_id)
+    record_still_exists = await record_service.get_record(
+        db=db_session, record_id=created_record_a.id, user_id=user_a_id
+    )
     assert record_still_exists is not None
 
 
@@ -418,7 +335,9 @@ async def test_delete_record_api_own_record_success(test_client: AsyncClient, db
         exercise_date=datetime.date(2025, 7, 12), exercise='Record to Delete', weight=10, reps=1, set_reps=1
     )
     created_record = await record_service.create_record(db=db_session, record_in=record_data, user_id=user_id)
-    record_id_to_delete = created_record.user_id
+    record_id_to_delete = created_record.id
+
+    assert record_id_to_delete is not None  # IDが採番されていることを確認
 
     # 自分の記録を削除
     response = await test_client.delete(f'/api/v1/records/{record_id_to_delete}', headers=auth_headers)
@@ -430,7 +349,9 @@ async def test_delete_record_api_own_record_success(test_client: AsyncClient, db
     assert deleted_data['exercise'] == 'Record to Delete'
 
     # DBから実際に削除されたことを確認
-    record_should_be_gone = await record_service.get_record(db=db_session, record_id=record_id_to_delete)
+    record_should_be_gone = await record_service.get_record(
+        db=db_session, record_id=record_id_to_delete, user_id=user_id
+    )
     assert record_should_be_gone is None
 
 
@@ -451,7 +372,7 @@ async def test_delete_record_service_own_record(db_session: AsyncSession):
     assert deleted_record.id == record_id_to_delete
 
     # DBから削除されたか確認
-    record_in_db = await record_service.get_record(db=db_session, record_id=record_id_to_delete)
+    record_in_db = await record_service.get_record(db=db_session, record_id=record_id_to_delete, user_id=user_id)
     assert record_in_db is None
 
 
@@ -475,7 +396,7 @@ async def test_delete_record_service_another_users_record(db_session: AsyncSessi
     assert deleted_record is None  # 削除されずNoneが返る
 
     # DBに記録が残っているか確認
-    record_in_db = await record_service.get_record(db=db_session, record_id=record_id_to_delete)
+    record_in_db = await record_service.get_record(db=db_session, record_id=record_id_to_delete, user_id=owner_user_id)
     assert record_in_db is not None  # 記録は削除されていない
 
 
@@ -487,3 +408,97 @@ async def test_delete_record_service_not_found(db_session: AsyncSession):
         db=db_session, record_id=non_existent_record_id, user_id=user_id
     )
     assert deleted_record is None
+
+
+async def test_read_single_record_api_no_token(test_client: AsyncClient, db_session: AsyncSession):
+    """
+    GET /api/v1/records/{record_id} にトークンなしでアクセスすると 401 Unauthorized が返る。
+    """
+    # ダミーの記録を作成 (削除テストのものを参考に、user_idはサービスに任せるので不要)
+    record_data = RecordCreate(
+        exercise_date=datetime.date(2025, 7, 15), exercise='Test Read No Token', weight=10, reps=1, set_reps=1
+    )
+    # サービスを使って記録を作成 (user_idは仮で1とするが、このテストの本質ではない)
+    # ただし、この記録IDは実際には使わないが、エンドポイントが存在することを示すために何かIDが必要
+    created_record = await record_service.create_record(db=db_session, record_in=record_data, user_id=1)
+
+    response = await test_client.get(f'/api/v1/records/{created_record.id}')  # 存在しうるIDで試す
+    assert response.status_code == 401
+
+
+async def test_read_single_record_api_another_users_record(test_client: AsyncClient, db_session: AsyncSession):
+    """
+    認証済みユーザーが他人の記録を読み取ろうとすると 404 Not Found が返る。
+    """
+    # ユーザーA (記録の所有者)
+    user_a_email = 'user_a_read_single@example.com'
+    user_a_password = 'password_a'
+    # get_auth_headers内でユーザーが作成される
+    headers_a = await get_auth_headers(test_client, db_session, user_a_email, user_a_password, 'userAReadSingle')
+    me_response_a = await test_client.get('/api/v1/users/me', headers=headers_a)
+    user_a_id = me_response_a.json()['id']
+
+    # ユーザーB (記録の読み取りを試みるユーザー)
+    user_b_email = 'user_b_read_single@example.com'
+    user_b_password = 'password_b'
+    headers_b = await get_auth_headers(test_client, db_session, user_b_email, user_b_password, 'userBReadSingle')
+
+    # ユーザーAの記録を作成
+    record_data_a = RecordCreate(
+        exercise_date=datetime.date(2025, 7, 16), exercise="User A's Private Record", weight=20, reps=1, set_reps=1
+    )
+    created_record_a = await record_service.create_record(db=db_session, record_in=record_data_a, user_id=user_a_id)
+
+    # ユーザーBがユーザーAの記録を読み取ろうとする
+    response = await test_client.get(f'/api/v1/records/{created_record_a.id}', headers=headers_b)
+
+    assert response.status_code == 404
+
+
+async def test_read_single_record_api_own_record_success(test_client: AsyncClient, db_session: AsyncSession):
+    """
+    認証済みユーザーが自分の記録を読み取ると成功し、正しいデータが返る。
+    """
+    user_email = 'owner_reader@example.com'
+    user_password = 'password_owner_read'
+    auth_headers = await get_auth_headers(test_client, db_session, user_email, user_password, 'ownerReader')
+    me_response = await test_client.get('/api/v1/users/me', headers=auth_headers)
+    user_id = me_response.json()['id']
+
+    # 自分の記録を作成
+    record_data = RecordCreate(
+        exercise_date=datetime.date(2025, 7, 17),
+        exercise='My Readable Record',
+        weight=30,
+        reps=1,
+        set_reps=1,
+        notes='Test this read',
+    )
+
+    created_record = await record_service.create_record(db=db_session, record_in=record_data, user_id=user_id)
+    record_id_to_read = created_record.id
+
+    # 自分の記録を読み取る
+    response = await test_client.get(f'/api/v1/records/{record_id_to_read}', headers=auth_headers)
+
+    # アサーション
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data['id'] == record_id_to_read
+    assert response_data['exercise'] == 'My Readable Record'
+    assert response_data['user_id'] == user_id
+    assert response_data['notes'] == 'Test this read'
+
+
+async def test_read_single_record_api_record_not_found_for_owner(test_client: AsyncClient, db_session: AsyncSession):
+    """
+    認証済みユーザーが存在しない自分の記録IDで読み取ろうとすると 404 Not Found が返る。
+    """
+    user_email = 'owner_reader_404@example.com'
+    user_password = 'password_owner_404'
+    auth_headers = await get_auth_headers(test_client, db_session, user_email, user_password, 'ownerReader404')
+
+    non_existent_record_id = 99990
+    response = await test_client.get(f'/api/v1/records/{non_existent_record_id}', headers=auth_headers)
+
+    assert response.status_code == 404
