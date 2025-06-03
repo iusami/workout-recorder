@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 
+from sqlalchemy import asc, column
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -70,14 +71,25 @@ async def get_record(db: AsyncSession, record_id: int, user_id: int) -> Optional
     return record
 
 
-async def get_records(db: AsyncSession, skip: int = 0, limit: int = 100) -> list[WorkoutRecord]:
+async def get_records(db: AsyncSession, user_id: int, skip: int = 0, limit: int = 100) -> list[WorkoutRecord]:
     """
     トレーニング記録の一覧をデータベースから取得する。
     skip と limit を使ってページネーションをサポートする。
     """
-    statement = select(WorkoutRecord).offset(skip).limit(limit)
+    logger.debug('Fetching list of workout records for user_id: %s with skip: %s, limit: %s', user_id, skip, limit)
+
+    statement = (
+        select(WorkoutRecord)
+        .where(WorkoutRecord.user_id == user_id)  # ユーザーIDでフィルタリング
+        .offset(skip)
+        .limit(limit)
+        .order_by(asc(column('id')))  # IDで昇順にソート
+    )
+
     result = await db.exec(statement)
     records = result.all()
+
+    logger.debug('Found %s records for user_id: %s.', len(records), user_id)
     return list(records)
 
 

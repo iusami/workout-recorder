@@ -47,37 +47,6 @@ async def test_get_record_by_id_service_not_found(db_session: AsyncSession):
     assert retrieved_record is None
 
 
-async def test_read_records_api_success(test_client: AsyncClient, db_session: AsyncSession):
-    """
-    GET /api/v1/records/ が成功し、記録のリストを返すことをテストする。
-    """
-    # 1. 事前に複数のテストデータをDBに作成
-    test_user_id = 1
-    record1_data = RecordCreate(
-        exercise_date=datetime.date(2025, 6, 1), exercise='Push Up', weight=0, reps=20, set_reps=3, notes='Record 1'
-    )
-    record2_data = RecordCreate(
-        exercise_date=datetime.date(2025, 6, 2), exercise='Pull Up', weight=0, reps=10, set_reps=3, notes='Record 2'
-    )
-    await record_service.create_record(db=db_session, record_in=record1_data, user_id=test_user_id)
-    await record_service.create_record(db=db_session, record_in=record2_data, user_id=test_user_id)
-
-    # 2. APIエンドポイントを呼び出す
-    response = await test_client.get('/api/v1/records/')
-
-    # 3. アサーション
-    assert response.status_code == 200  # 成功時は200 OK
-
-    # 4. レスポンスボディのチェック
-    response_data = response.json()
-    assert isinstance(response_data, list)  # リスト形式であること
-    assert len(response_data) == 2  # 作成した2件の記録が返ってくること
-
-    # (オプション) リストの中身も簡単にチェック
-    assert response_data[0]['exercise'] == record1_data.exercise
-    assert response_data[1]['exercise'] == record2_data.exercise
-
-
 async def test_get_records_service(db_session: AsyncSession):
     """
     record_service.get_records が記録のリストを正しく取得できることをテストする。
@@ -92,7 +61,7 @@ async def test_get_records_service(db_session: AsyncSession):
     await record_service.create_record(db=db_session, record_in=record2_data, user_id=test_user_id)
 
     # 2. サービス関数を呼び出す
-    retrieved_records = await record_service.get_records(db=db_session, skip=0, limit=10)
+    retrieved_records = await record_service.get_records(db=db_session, skip=0, limit=10, user_id=test_user_id)
 
     # 3. アサーション
     assert retrieved_records is not None
@@ -102,9 +71,9 @@ async def test_get_records_service(db_session: AsyncSession):
     assert retrieved_records[1].exercise == 'Leg Press'
 
     # (オプション) skip と limit のテストも追加するとより堅牢
-    limited_records = await record_service.get_records(db=db_session, skip=0, limit=1)
+    limited_records = await record_service.get_records(db=db_session, skip=0, limit=1, user_id=test_user_id)
     assert len(limited_records) == 1
-    skipped_records = await record_service.get_records(db=db_session, skip=1, limit=1)
+    skipped_records = await record_service.get_records(db=db_session, skip=1, limit=1, user_id=test_user_id)
     assert len(skipped_records) == 1
     assert skipped_records[0].exercise == 'Leg Press'  # 2番目の記録のはず
 
@@ -502,3 +471,199 @@ async def test_read_single_record_api_record_not_found_for_owner(test_client: As
     response = await test_client.get(f'/api/v1/records/{non_existent_record_id}', headers=auth_headers)
 
     assert response.status_code == 404
+
+
+async def test_read_records_list_api_no_token(test_client: AsyncClient):
+    """
+    GET /api/v1/records/ にトークンなしでアクセスすると 401 Unauthorized が返る。
+    """
+    response = await test_client.get('/api/v1/records/')
+    assert response.status_code == 401
+
+async def test_read_records_list_api_own_records_only(test_client: AsyncClient, db_session: AsyncSession):
+    """
+    認証済みユーザーが記録一覧を取得すると、自分の記録のみが返され、他人の記録は含まれない。
+    """
+    # ユーザーA を作成しログイン、記録も作成
+    user_a_email = 'user_a_list@example.com'
+    user_a_password = 'password_a_list'
+    headers_a = await get_auth_headers(test_client, db_session, user_a_email, user_a_password, 'userAList')
+    me_response_a = await test_client.get('/api/v1/users/me', headers=headers_a)
+    user_a_id = me_response_a.json()['id']
+
+    record_a1_data = RecordCreate(
+        exercise_date=datetime.date(2025, 7, 20), exercise='Record A1', weight=10, reps=1, set_reps=1
+    )
+    record_a2_data = RecordCreate(
+        exercise_date=datetime.date(2025, 7, 21), exercise='Record A2', weight=20, reps=1, set_reps=1
+    )
+    await record_service.create_record(db=db_session, record_in=record_a1_data, user_id=user_a_id)
+    await record_service.create_record(db=db_session, record_in=record_a2_data, user_id=user_a_id)
+
+    # ユーザーB を作成 (ログインは不要、記録作成用)
+    user_b_email = 'user_b_list@example.com'
+    user_b_password = 'password_b_list'
+    # ユーザーBも作成しておく (get_auth_headers内で作成されるか、別途作成)
+    user_b_create_data = UserCreate(email=user_b_email, username='userBList', password=user_b_password)
+    user_b = await user_service.create_user(db=db_session, user_in=user_b_create_data)
+    assert user_b is not None
+    user_b_id = user_b.id
+
+    record_b1_data = RecordCreate(
+        exercise_date=datetime.date(2025, 7, 22), exercise='Record B1 (Other user)', weight=30, reps=1, set_reps=1
+    )
+    await record_service.create_record(db=db_session, record_in=record_b1_data, user_id=user_b_id)
+
+    # ユーザーAとして記録一覧を取得
+    response_a = await test_client.get('/api/v1/records/', headers=headers_a)
+
+    # アサーション
+    assert response_a.status_code == 200
+    records_for_a = response_a.json()
+    assert isinstance(records_for_a, list)
+    assert len(records_for_a) == 2  # ユーザーAの記録のみ2件のはず
+    for record in records_for_a:
+        assert record['user_id'] == user_a_id  # 返された記録のuser_idがユーザーAのものであること
+        assert record['exercise'] != 'Record B1 (Other user)'  # ユーザーBの記録が含まれていないこと
+
+
+async def test_read_records_list_api_pagination(test_client: AsyncClient, db_session: AsyncSession):
+    """
+    記録一覧取得時のページネーション (skip, limit) が機能することをテストする。
+    (このテストは、所有権が実装された後に、自分の記録に対して行う)
+    """
+    user_email = 'pager_user@example.com'
+    user_password = 'password_pager'
+    auth_headers = await get_auth_headers(test_client, db_session, user_email, user_password, 'pagerUser')
+    me_response = await test_client.get('/api/v1/users/me', headers=auth_headers)
+    user_id = me_response.json()['id']
+
+    # 3件の記録を作成
+    for i in range(3):
+        await record_service.create_record(
+            db=db_session,
+            record_in=RecordCreate(
+                exercise_date=datetime.date(2025, 7, 23 + i),
+                exercise=f'Paged Record {i + 1}',
+                weight=10 + i,
+                reps=1,
+                set_reps=1,
+            ),
+            user_id=user_id,
+        )
+
+    # skip=0, limit=1 (最初の1件)
+    response1 = await test_client.get('/api/v1/records/?skip=0&limit=1', headers=auth_headers)
+    assert response1.status_code == 200
+    data1 = response1.json()
+    assert len(data1) == 1
+    assert data1[0]['exercise'] == 'Paged Record 1'
+
+    # skip=1, limit=1 (2番目の1件)
+    response2 = await test_client.get('/api/v1/records/?skip=1&limit=1', headers=auth_headers)
+    assert response2.status_code == 200
+    data2 = response2.json()
+    assert len(data2) == 1
+    assert data2[0]['exercise'] == 'Paged Record 2'
+
+    # skip=0, limit=5 (全件取得できる十分なlimit)
+    response_all = await test_client.get('/api/v1/records/?skip=0&limit=5', headers=auth_headers)
+    assert response_all.status_code == 200
+    data_all = response_all.json()
+    assert len(data_all) == 3
+
+
+async def test_get_records_service_own_records_only(db_session: AsyncSession):
+    """
+    record_service.get_records が、指定されたユーザーの記録のみを返し、
+    他人の記録は返さないことをテストする。
+    """
+    user1_id = 101
+    user2_id = 102
+
+    # ユーザー1の記録を作成
+    await record_service.create_record(
+        db=db_session,
+        record_in=RecordCreate(
+            exercise_date=datetime.date(2025, 7, 25), exercise='User1 Record1', weight=10, reps=1, set_reps=1
+        ),
+        user_id=user1_id,
+    )
+    await record_service.create_record(
+        db=db_session,
+        record_in=RecordCreate(
+            exercise_date=datetime.date(2025, 7, 26), exercise='User1 Record2', weight=10, reps=1, set_reps=1
+        ),
+        user_id=user1_id,
+    )
+
+    # ユーザー2の記録を作成
+    await record_service.create_record(
+        db=db_session,
+        record_in=RecordCreate(
+            exercise_date=datetime.date(2025, 7, 27), exercise='User2 Record1', weight=10, reps=1, set_reps=1
+        ),
+        user_id=user2_id,
+    )
+
+    # ユーザー1の記録を取得
+    records_user1 = await record_service.get_records(db=db_session, user_id=user1_id, skip=0, limit=10)
+    assert len(records_user1) == 2
+    for record in records_user1:
+        assert record.user_id == user1_id
+
+    # ユーザー2の記録を取得
+    records_user2 = await record_service.get_records(db=db_session, user_id=user2_id, skip=0, limit=10)
+    assert len(records_user2) == 1
+    assert records_user2[0].user_id == user2_id
+    assert records_user2[0].exercise == 'User2 Record1'
+
+
+async def test_get_records_service_pagination(db_session: AsyncSession):
+    """
+    record_service.get_records のページネーションが正しく機能することをテストする。
+    (特定のユーザーの記録に対して)
+    """
+    user_id_pager = 103
+    # 5件の記録を作成
+    for i in range(5):
+        await record_service.create_record(
+            db=db_session,
+            record_in=RecordCreate(
+                exercise_date=datetime.date(2025, 7, 25 + i),
+                exercise=f'Pager Record {i + 1} for user {user_id_pager}',
+                weight=10 + i,
+                reps=1,
+                set_reps=1,
+            ),
+            user_id=user_id_pager,
+        )
+    # 他のユーザーの記録も混ぜておく (フィルタリングされるはず)
+    await record_service.create_record(
+        db=db_session,
+        record_in=RecordCreate(
+            exercise_date=datetime.date(2025, 8, 1), exercise='Other User Pager Record', weight=10, reps=1, set_reps=1
+        ),
+        user_id=user_id_pager + 1,
+    )
+
+    # 最初の2件を取得
+    records_page1 = await record_service.get_records(db=db_session, user_id=user_id_pager, skip=0, limit=2)
+    assert len(records_page1) == 2
+    assert records_page1[0].exercise == f'Pager Record 1 for user {user_id_pager}'
+    assert records_page1[1].exercise == f'Pager Record 2 for user {user_id_pager}'
+
+    # 次の2件を取得
+    records_page2 = await record_service.get_records(db=db_session, user_id=user_id_pager, skip=2, limit=2)
+    assert len(records_page2) == 2
+    assert records_page2[0].exercise == f'Pager Record 3 for user {user_id_pager}'
+    assert records_page2[1].exercise == f'Pager Record 4 for user {user_id_pager}'
+
+    # 最後の1件を取得
+    records_page3 = await record_service.get_records(db=db_session, user_id=user_id_pager, skip=4, limit=2)
+    assert len(records_page3) == 1
+    assert records_page3[0].exercise == f'Pager Record 5 for user {user_id_pager}'
+
+    # 存在しないページ
+    records_empty_page = await record_service.get_records(db=db_session, user_id=user_id_pager, skip=10, limit=2)
+    assert len(records_empty_page) == 0

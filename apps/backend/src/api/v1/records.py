@@ -43,11 +43,12 @@ async def read_records_endpoint(
     db: AsyncSession = Depends(get_session),
     skip: int = 0,
     limit: int = 100,
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     トレーニング記録の一覧を読み取る。
     """
-    records = await record_service.get_records(db=db, skip=skip, limit=limit)
+    records = await record_service.get_records(db=db, user_id=current_user.id, skip=skip, limit=limit)
     return records
 
 
