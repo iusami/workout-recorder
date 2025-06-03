@@ -478,8 +478,7 @@ async def test_read_records_list_api_no_token(test_client: AsyncClient):
     GET /api/v1/records/ にトークンなしでアクセスすると 401 Unauthorized が返る。
     """
     response = await test_client.get('/api/v1/records/')
-    assert response.status_code == 401  # レッド！ (エンドポイントがまだ保護されていないため)
-
+    assert response.status_code == 401
 
 async def test_read_records_list_api_own_records_only(test_client: AsyncClient, db_session: AsyncSession):
     """
