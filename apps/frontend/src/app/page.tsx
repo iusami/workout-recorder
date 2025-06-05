@@ -13,6 +13,11 @@ export default function Index() {
               <span> Hello there, </span>
               Welcome @workout-recorder/frontend 👋
             </h1>
+            <div className="mt-4">
+              <a href="/profile" className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                Manage Profile
+              </a>
+            </div>
           </div>
 
           <div id="hero" className="rounded">

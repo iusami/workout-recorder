@@ -9,7 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.core.logger import APP_LOGGER_NAME
 from src.core.security import hash_password, verify_password
 from src.models.user import User
-from src.schemas.user import UserCreate
+from src.schemas.user import UserCreate, UserProfileUpdate
 
 logger = logging.getLogger(APP_LOGGER_NAME)
 
@@ -90,4 +90,35 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> Opti
 
     # 4. すべてのチェックをパスしたら、ユーザーオブジェクトを返す (認証成功)
     logger.info('User %s authenticated successfully.', email)
+    return user
+
+
+async def update_user_profile(
+    db: AsyncSession, user_id: int, profile_data: UserProfileUpdate
+) -> Optional[User]:
+    """
+    ユーザーのプロフィール情報を更新する。
+    """
+    logger.info('Updating profile for user ID: %s', user_id)
+    
+    # ユーザーを取得
+    statement = select(User).where(User.id == user_id)
+    result = await db.exec(statement)
+    user = result.one_or_none()
+    
+    if not user:
+        logger.error('User not found for ID: %s', user_id)
+        return None
+    
+    # プロフィールデータを更新 (Noneでない値のみ)
+    update_data = profile_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        if hasattr(user, field):
+            setattr(user, field, value)
+    
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    
+    logger.info('Profile updated successfully for user ID: %s', user_id)
     return user
