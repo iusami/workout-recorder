@@ -480,6 +480,7 @@ async def test_read_records_list_api_no_token(test_client: AsyncClient):
     response = await test_client.get('/api/v1/records/')
     assert response.status_code == 401
 
+
 async def test_read_records_list_api_own_records_only(test_client: AsyncClient, db_session: AsyncSession):
     """
     認証済みユーザーが記録一覧を取得すると、自分の記録のみが返され、他人の記録は含まれない。
@@ -668,96 +669,112 @@ async def test_get_records_service_pagination(db_session: AsyncSession):
     records_empty_page = await record_service.get_records(db=db_session, user_id=user_id_pager, skip=10, limit=2)
     assert len(records_empty_page) == 0
 
+
 async def test_update_record_api_no_token(test_client: AsyncClient, db_session: AsyncSession):
     """
     PUT /api/v1/records/{record_id} にトークンなしでアクセスすると 401 Unauthorized が返る。
     """
     # ダミーの記録を作成
+    user_data = UserCreate(email='test_user_no_token@example.com', password='password_no_token')
+    created_user = await user_service.create_user(db=db_session, user_in=user_data)
+
+    assert created_user is not None, 'Failed to create test user for no token update test'
+
+    # ダミーの記録を作成
     record_data = RecordCreate(
-        exercise_date=datetime.date(2025, 8, 1), exercise="Test Update No Token", weight=10, reps=1, set_reps=1)
-    created_record = await record_service.create_record(db=db_session, record_in=record_data, user_id=1) # user_idは仮
-    
-    update_payload = {"notes": "Updated without token"}
-    response = await test_client.put(f"/api/v1/records/{created_record.id}", json=update_payload)
+        exercise_date=datetime.date(2025, 8, 1), exercise='Test Update No Token', weight=10, reps=1, set_reps=1
+    )
+    created_record = await record_service.create_record(db=db_session, record_in=record_data, user_id=created_user.id)
+
+    update_payload = {'notes': 'Updated without token'}
+    response = await test_client.put(f'/api/v1/records/{created_record.id}', json=update_payload)
     assert response.status_code == 401
+
 
 async def test_update_record_api_another_users_record(test_client: AsyncClient, db_session: AsyncSession):
     """
     認証済みユーザーが他人の記録を更新しようとすると 404 Not Found (または 403) が返る。
     """
     # ユーザーA (記録の所有者)
-    user_a_email = "user_a_update@example.com"
-    user_a_password = "password_a"
-    headers_a = await get_auth_headers(test_client, db_session, user_a_email, user_a_password, "userAUpdate")
-    me_response_a = await test_client.get("/api/v1/users/me", headers=headers_a)
-    user_a_id = me_response_a.json()["id"]
+    user_a_email = 'user_a_update@example.com'
+    user_a_password = 'password_a'
+    headers_a = await get_auth_headers(test_client, db_session, user_a_email, user_a_password, 'userAUpdate')
+    me_response_a = await test_client.get('/api/v1/users/me', headers=headers_a)
+    user_a_id = me_response_a.json()['id']
 
     # ユーザーB (更新を試みるユーザー)
-    user_b_email = "user_b_update@example.com"
-    user_b_password = "password_b"
-    headers_b = await get_auth_headers(test_client, db_session, user_b_email, user_b_password, "userBUpdate")
+    user_b_email = 'user_b_update@example.com'
+    user_b_password = 'password_b'
+    headers_b = await get_auth_headers(test_client, db_session, user_b_email, user_b_password, 'userBUpdate')
 
     # ユーザーAの記録を作成
     record_data_a = RecordCreate(
-        exercise_date=datetime.date(2025, 8, 2), exercise="User A's Record to Update", weight=20, reps=1, set_reps=1)
+        exercise_date=datetime.date(2025, 8, 2), exercise="User A's Record to Update", weight=20, reps=1, set_reps=1
+    )
     created_record_a = await record_service.create_record(db=db_session, record_in=record_data_a, user_id=user_a_id)
 
-    update_payload_by_b = {"notes": "User B trying to update User A's record"}
+    update_payload_by_b = {'notes': "User B trying to update User A's record"}
     # ユーザーBがユーザーAの記録を更新しようとする
     response = await test_client.put(
-        f"/api/v1/records/{created_record_a.id}", json=update_payload_by_b, headers=headers_b)
-    
+        f'/api/v1/records/{created_record_a.id}', json=update_payload_by_b, headers=headers_b
+    )
+
     assert response.status_code == 404
+
 
 async def test_update_record_api_own_record_success(test_client: AsyncClient, db_session: AsyncSession):
     """
     認証済みユーザーが自分の記録を更新すると成功し、更新されたデータが返る。
     """
-    user_email = "owner_updater@example.com"
-    user_password = "password_owner_update"
-    auth_headers = await get_auth_headers(test_client, db_session, user_email, user_password, "ownerUpdater")
-    me_response = await test_client.get("/api/v1/users/me", headers=auth_headers)
-    user_id = me_response.json()["id"]
+    user_email = 'owner_updater@example.com'
+    user_password = 'password_owner_update'
+    auth_headers = await get_auth_headers(test_client, db_session, user_email, user_password, 'ownerUpdater')
+    me_response = await test_client.get('/api/v1/users/me', headers=auth_headers)
+    user_id = me_response.json()['id']
 
     # 自分の記録を作成
-    initial_exercise_name = "My Record Before Update"
+    initial_exercise_name = 'My Record Before Update'
     record_data = RecordCreate(
-        exercise_date=datetime.date(2025, 8, 3), exercise=initial_exercise_name,
-        weight=30, reps=1, set_reps=1, notes="Initial notes"
+        exercise_date=datetime.date(2025, 8, 3),
+        exercise=initial_exercise_name,
+        weight=30,
+        reps=1,
+        set_reps=1,
+        notes='Initial notes',
     )
     created_record = await record_service.create_record(db=db_session, record_in=record_data, user_id=user_id)
     record_id_to_update = created_record.id
 
     # 更新用データ (一部のフィールドのみ)
-    update_payload = {
-        "notes": "Successfully updated notes!",
-        "reps": 12
-    }
+    update_payload = {'notes': 'Successfully updated notes!', 'reps': 12}
 
     # 自分の記録を更新
     response = await test_client.put(
-        f"/api/v1/records/{record_id_to_update}", json=update_payload, headers=auth_headers)
+        f'/api/v1/records/{record_id_to_update}', json=update_payload, headers=auth_headers
+    )
 
     # アサーション
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data["id"] == record_id_to_update
-    assert response_data["notes"] == update_payload["notes"] # 更新された
-    assert response_data["reps"] == update_payload["reps"]   # 更新された
-    assert response_data["exercise"] == initial_exercise_name # 更新していないフィールドは元のまま
-    assert response_data["user_id"] == user_id
+    assert response_data['id'] == record_id_to_update
+    assert response_data['notes'] == update_payload['notes']  # 更新された
+    assert response_data['reps'] == update_payload['reps']  # 更新された
+    assert response_data['exercise'] == initial_exercise_name  # 更新していないフィールドは元のまま
+    assert response_data['user_id'] == user_id
+
 
 async def test_update_record_api_record_not_found_for_owner(test_client: AsyncClient, db_session: AsyncSession):
     """
     認証済みユーザーが存在しない自分の記録IDで更新しようとすると 404 Not Found が返る。
     """
-    user_email = "owner_updater_404@example.com"
-    user_password = "password_owner_update_404"
-    auth_headers = await get_auth_headers(test_client, db_session, user_email, user_password, "ownerUpdater404")
-    
+    user_email = 'owner_updater_404@example.com'
+    user_password = 'password_owner_update_404'
+    auth_headers = await get_auth_headers(test_client, db_session, user_email, user_password, 'ownerUpdater404')
+
     non_existent_record_id = 99980
-    update_payload = {"notes": "Trying to update non-existent record"}
+    update_payload = {'notes': 'Trying to update non-existent record'}
     response = await test_client.put(
-        f"/api/v1/records/{non_existent_record_id}", json=update_payload, headers=auth_headers)
+        f'/api/v1/records/{non_existent_record_id}', json=update_payload, headers=auth_headers
+    )
 
     assert response.status_code == 404
